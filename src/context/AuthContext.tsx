@@ -23,9 +23,11 @@ interface AuthContextType {
   error: string | null;
   isAdmin: boolean;
   isTeacher: boolean;
+  isStudentViewMode: boolean;
+  setStudentViewMode: (enabled: boolean) => void;
+  toggleStudentViewMode: () => void;
   loginWithGoogle: () => Promise<void>;
-  loginAsStudent: (displayName: string, classroomCode: string, avatarId: string) => Promise<void>;
-  loginAsTeacher: (name: string, email: string) => Promise<void>;
+  loginAsAdminDirect: (email?: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'classroomCode'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
@@ -35,21 +37,59 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_USER_KEY = 'history_card_quest_user';
+const LOCAL_STORAGE_STUDENT_VIEW_KEY = 'history_card_quest_student_view';
+
+export const isUserAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (normalized === 'jaf2jc@bearworks.jackson.sparcc.org') return true;
+  return (DEFAULT_GAME_SETTINGS.adminUids || []).some(
+    adminEmail => adminEmail.trim().toLowerCase() === normalized
+  );
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure master admin has admin role
+        if (isUserAdminEmail(parsed.email)) {
+          parsed.role = 'admin';
+        }
+        return parsed;
+      }
+      return null;
     } catch {
       return null;
+    }
+  });
+  const [isStudentViewMode, setIsStudentViewModeState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_STUDENT_VIEW_KEY) === 'true';
+    } catch {
+      return false;
     }
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync profile to local storage for fast Spark-friendly offline cache
+  const setStudentViewMode = (enabled: boolean) => {
+    setIsStudentViewModeState(enabled);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_STUDENT_VIEW_KEY, enabled ? 'true' : 'false');
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleStudentViewMode = () => {
+    setStudentViewMode(!isStudentViewMode);
+  };
+
+  // Sync profile to local storage
   const saveProfileLocally = (profile: UserProfile | null) => {
     setUserProfile(profile);
     if (profile) {
@@ -59,17 +99,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check if a user UID or email matches admin privileges
+  // Check if a user matches admin privileges
   const checkAdminPrivilege = (profile: UserProfile | null, fbUser: FirebaseUser | null): boolean => {
     if (!profile) return false;
-    if (profile.role === 'admin' || profile.role === 'teacher') return true;
-    if (fbUser && fbUser.email && DEFAULT_GAME_SETTINGS.adminUids.includes(fbUser.email)) return true;
-    if (profile.email && DEFAULT_GAME_SETTINGS.adminUids.includes(profile.email)) return true;
+    if (profile.role === 'admin') return true;
+    if (isUserAdminEmail(profile.email)) return true;
+    if (fbUser && fbUser.email && isUserAdminEmail(fbUser.email)) return true;
     return false;
   };
 
-  const isTeacher = userProfile?.role === 'teacher' || userProfile?.role === 'admin';
   const isAdmin = checkAdminPrivilege(userProfile, currentUser);
+  const isTeacher = isAdmin || userProfile?.role === 'teacher';
 
   // Helper: fetch or create Firestore user profile
   const syncFirestoreProfile = async (
@@ -92,17 +132,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const now = new Date().toISOString();
-    const isTeacherEmail = fallbackData.email && DEFAULT_GAME_SETTINGS.adminUids.includes(fallbackData.email);
-    const role: UserRole = isTeacherEmail ? 'teacher' : (existingData.role || fallbackData.role || 'student');
+    const emailToCheck = fallbackData.email || existingData.email || '';
+    const isAdminUser = isUserAdminEmail(emailToCheck);
+    
+    let role: UserRole = 'student';
+    if (isAdminUser) {
+      role = 'admin';
+    } else if (existingData.role) {
+      role = existingData.role;
+    } else if (fallbackData.role) {
+      role = fallbackData.role;
+    }
 
     const combinedProfile: UserProfile = {
       uid,
-      displayName: existingData.displayName || fallbackData.displayName || '8th Grade Historian',
-      avatar: existingData.avatar || fallbackData.avatar || 'franklin',
+      displayName: existingData.displayName || fallbackData.displayName || (isAdminUser ? 'Admin (Ohio History)' : '8th Grade Historian'),
+      avatar: existingData.avatar || fallbackData.avatar || (isAdminUser ? 'washington' : 'franklin'),
       classroomCode: existingData.classroomCode || fallbackData.classroomCode || 'OHIO-8A',
       role,
-      coins: typeof existingData.coins === 'number' ? existingData.coins : (fallbackData.coins ?? 50),
-      email: fallbackData.email || existingData.email,
+      coins: typeof existingData.coins === 'number' ? existingData.coins : (fallbackData.coins ?? (isAdminUser ? 500 : 50)),
+      email: emailToCheck || undefined,
       createdAt: existingData.createdAt || now,
       lastLoginAt: now,
       totalCardsCollected: existingData.totalCardsCollected ?? 0,
@@ -130,10 +179,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         setCurrentUser(user);
         if (user) {
+          const isUserAdmin = isUserAdminEmail(user.email);
           await syncFirestoreProfile(user.uid, {
-            displayName: user.displayName || '8th Grade Historian',
+            displayName: user.displayName || (isUserAdmin ? 'Admin (Ohio History)' : '8th Grade Student'),
             email: user.email || undefined,
-            role: (user.email && DEFAULT_GAME_SETTINGS.adminUids.includes(user.email)) ? 'teacher' : 'student'
+            role: isUserAdmin ? 'admin' : 'student'
           });
         }
         setLoading(false);
@@ -154,15 +204,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
       setCurrentUser(fbUser);
+      const isUserAdmin = isUserAdminEmail(fbUser.email);
       await syncFirestoreProfile(fbUser.uid, {
-        displayName: fbUser.displayName || '8th Grade Student',
-        email: fbUser.email || undefined
+        displayName: fbUser.displayName || (isUserAdmin ? 'Admin (Ohio History)' : '8th Grade Student'),
+        email: fbUser.email || undefined,
+        role: isUserAdmin ? 'admin' : 'student'
       });
     } catch (err: any) {
-      console.error("Google sign in error:", err);
-      // Helpful message for iframe sandboxes
+      console.error("Google sign in notice:", err);
+      // If popup is blocked or preview domain is not authorized in Firebase Console yet
       if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
-        setError("Sign-in popup was blocked by your browser. You can allow popups, open the app in a new tab, or use Classroom Student Sign-In below.");
+        setError("Google Sign-In popup was blocked by your browser. Please allow popups or use the direct Admin sign-in below.");
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        setError("This domain is pending authorization in Firebase Console. You can sign in using direct Admin authentication below.");
       } else {
         setError(err.message || "Failed to sign in with Google.");
       }
@@ -171,15 +225,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Classroom Student Login (Designed specifically for school Chromebooks and no-email student setups)
-  const loginAsStudent = async (displayName: string, classroomCode: string, avatarId: string) => {
+  // Direct Admin Login (Seamless one-click access for jaf2jc@bearworks.jackson.sparcc.org)
+  const loginAsAdminDirect = async (email: string = 'jaf2jc@bearworks.jackson.sparcc.org', name: string = 'Master Administrator') => {
     try {
       setError(null);
       setLoading(true);
-      
-      let uid = 'student_' + Math.random().toString(36).substring(2, 9);
-      
-      // Try anonymous sign-in with Firebase Auth
+      let uid = 'admin_' + email.replace(/[^a-zA-Z0-9]/g, '_');
       try {
         const userCred = await signInAnonymously(auth);
         if (userCred && userCred.user) {
@@ -187,51 +238,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(userCred.user);
         }
       } catch (authErr) {
-        console.warn("Anonymous auth notice, creating student session:", authErr);
+        console.warn("Anonymous auth notice for admin session:", authErr);
       }
 
       await syncFirestoreProfile(uid, {
-        displayName: displayName.trim() || 'Ohio Explorer',
-        classroomCode: classroomCode.trim().toUpperCase() || 'OHIO-8A',
-        avatar: avatarId || 'franklin',
-        role: 'student',
-        coins: 50 // Welcome bonus for new historians
-      });
-    } catch (err: any) {
-      console.error("Classroom login error:", err);
-      setError(err.message || "Unable to start student quest session.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Teacher Login (Direct switch for the 8th grade teacher)
-  const loginAsTeacher = async (name: string, email: string) => {
-    try {
-      setError(null);
-      setLoading(true);
-      let uid = 'teacher_ohio_8';
-      try {
-        const userCred = await signInAnonymously(auth);
-        if (userCred && userCred.user) {
-          uid = userCred.user.uid;
-          setCurrentUser(userCred.user);
-        }
-      } catch (authErr) {
-        console.warn("Anonymous auth notice for teacher session:", authErr);
-      }
-
-      await syncFirestoreProfile(uid, {
-        displayName: name.trim() || 'Mr./Ms. Ohio History Teacher',
-        email: email.trim() || 'jaf2jc@bearworks.jackson.sparcc.org',
+        displayName: name,
+        email: email,
         classroomCode: 'OHIO-8A',
         avatar: 'washington',
-        role: 'teacher',
-        coins: 500
+        role: 'admin',
+        coins: 1000
       });
     } catch (err: any) {
-      console.error("Teacher sign-in error:", err);
-      setError(err.message || "Failed to initialize teacher session.");
+      console.error("Direct admin sign-in error:", err);
+      setError(err.message || "Failed to initialize administrator session.");
     } finally {
       setLoading(false);
     }
@@ -245,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setCurrentUser(null);
     saveProfileLocally(null);
+    setStudentViewMode(false);
   };
 
   const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'classroomCode'>>) => {
@@ -287,9 +308,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       error,
       isAdmin,
       isTeacher,
+      isStudentViewMode,
+      setStudentViewMode,
+      toggleStudentViewMode,
       loginWithGoogle,
-      loginAsStudent,
-      loginAsTeacher,
+      loginAsAdminDirect,
       logout,
       updateUserProfile,
       updateCoins,

@@ -15,7 +15,16 @@ import {
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
-  const { userProfile, updateUserProfile, updateCoins, logout, isTeacher } = useAuth();
+  const { 
+    userProfile, 
+    updateUserProfile, 
+    updateCoins, 
+    logout, 
+    isTeacher, 
+    isAdmin, 
+    isStudentViewMode, 
+    toggleStudentViewMode 
+  } = useAuth();
   
   if (!userProfile) return null;
 
@@ -57,7 +66,7 @@ export const ProfileView: React.FC = () => {
                 {userProfile.displayName}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                {userProfile.role === 'teacher' ? 'Classroom Educator' : '8th Grade Student'}
+                {isAdmin ? 'Master Administrator' : userProfile.role === 'teacher' ? 'Classroom Educator' : '8th Grade Student'}
               </span>
             </div>
 

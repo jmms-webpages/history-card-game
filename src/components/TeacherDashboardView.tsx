@@ -12,11 +12,12 @@ import {
   Plus, 
   Check, 
   Sliders,
-  Users
+  Users,
+  Eye
 } from 'lucide-react';
 
 export const TeacherDashboardView: React.FC = () => {
-  const { userProfile, isTeacher } = useAuth();
+  const { userProfile, isTeacher, isAdmin, setStudentViewMode } = useAuth();
   
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'economy'>('overview');
   const [dailyLimit, setDailyLimit] = useState(DEFAULT_GAME_SETTINGS.dailyQuestionLimit);
@@ -56,10 +57,10 @@ export const TeacherDashboardView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black font-serif text-slate-100">
-                  Ohio 8th Grade Educator Portal
+                  Ohio 8th Grade {isAdmin ? 'Master Admin' : 'Educator'} Portal
                 </h1>
                 <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  Teacher Verified
+                  {isAdmin ? 'Master Administrator' : 'Teacher Verified'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -68,9 +69,21 @@ export const TeacherDashboardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Admin UID: {userProfile?.uid.substring(0, 10)}...</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              id="admin-launch-student-view"
+              onClick={() => setStudentViewMode(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-950/80 border border-emerald-700 text-emerald-300 hover:bg-emerald-900/90 transition-all cursor-pointer shadow-sm"
+              title="Switch directly into student view mode"
+            >
+              <Eye className="w-4 h-4 text-emerald-400" />
+              <span>Launch Student View</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>{userProfile?.email || `UID: ${userProfile?.uid.substring(0, 10)}...`}</span>
+            </div>
           </div>
         </div>
 

@@ -122,4 +122,5 @@ export type NavigationTab =
   | 'collection'
   | 'trading'
   | 'profile'
-  | 'teacher';
+  | 'teacher'
+  | 'student-view';

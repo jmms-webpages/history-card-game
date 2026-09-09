@@ -47,7 +47,7 @@ const MainAppContent: React.FC = () => {
 
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {currentTab === 'dashboard' && <DashboardView onNavigate={setCurrentTab} />}
+        {(currentTab === 'dashboard' || currentTab === 'student-view') && <DashboardView onNavigate={setCurrentTab} />}
         {currentTab === 'questions' && <QuestionsView />}
         {currentTab === 'packs' && <PacksView />}
         {currentTab === 'collection' && <CollectionView />}
