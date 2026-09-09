@@ -18,6 +18,7 @@ import {
   query, 
   where, 
   getDocs,
+  deleteDoc,
   serverTimestamp,
   Firestore
 } from 'firebase/firestore';
@@ -69,6 +70,7 @@ export {
   query,
   where,
   getDocs,
+  deleteDoc,
   serverTimestamp
 };
 export type { FirebaseUser };

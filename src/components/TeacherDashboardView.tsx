@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
+import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { 
   GraduationCap, 
@@ -15,7 +16,10 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
-  Filter
+  Filter,
+  Package,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { Question } from '../types';
 
@@ -29,8 +33,17 @@ export const TeacherDashboardView: React.FC = () => {
     toggleQuestionActive, 
     deleteQuestion 
   } = useQuestions();
+
+  const {
+    cards,
+    toggleCardActive
+  } = useCards();
   
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'questions' | 'economy'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'questions' | 'economy' | 'cards'>('overview');
+  
+  // Card catalog filter state
+  const [filterCardUnit, setFilterCardUnit] = useState<string>('all');
+  const [filterCardRarity, setFilterCardRarity] = useState<string>('all');
   
   // Economy form state
   const [dailyLimit, setDailyLimit] = useState(gameSettings.dailyQuestionLimit);
@@ -200,6 +213,16 @@ export const TeacherDashboardView: React.FC = () => {
             }`}
           >
             Coin Economy & Limits
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('cards')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'cards' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>Card Catalog ({cards.length})</span>
           </button>
         </div>
       </div>
@@ -493,6 +516,176 @@ export const TeacherDashboardView: React.FC = () => {
             <span>Apply Economy Settings</span>
           </button>
         </form>
+      )}
+
+      {/* Card Catalog Tab */}
+      {activeSubTab === 'cards' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Rarity & Status Metric Tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Cards</span>
+              <span className="text-xl font-bold font-mono text-slate-100 mt-0.5 block">{cards.length}</span>
+              <span className="text-[10px] text-emerald-400">{cards.filter(c => c.active).length} Active</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-slate-400 block">Common (65%)</span>
+              <span className="text-xl font-bold font-mono text-slate-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Common').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Base tier</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-emerald-400 block">Uncommon (22%)</span>
+              <span className="text-xl font-bold font-mono text-emerald-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Uncommon').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Core concepts</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-blue-400 block">Rare (9%)</span>
+              <span className="text-xl font-bold font-mono text-blue-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Rare').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Key artifacts</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-amber-400 block">Legendary (3.5%)</span>
+              <span className="text-xl font-bold font-mono text-amber-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Legendary').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Major leaders</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-purple-400 block">Mythical (0.5%)</span>
+              <span className="text-xl font-bold font-mono text-purple-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Mythical').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Foundational</span>
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-400 font-mono">Unit:</span>
+                <select
+                  value={filterCardUnit}
+                  onChange={(e) => setFilterCardUnit(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="all">All Units ({cards.length})</option>
+                  {INITIAL_UNITS.map(u => (
+                    <option key={u.unitId} value={u.unitId}>
+                      {u.order}. {u.unitName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono">Rarity:</span>
+                <select
+                  value={filterCardRarity}
+                  onChange={(e) => setFilterCardRarity(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="all">All Rarities</option>
+                  <option value="Common">Common</option>
+                  <option value="Uncommon">Uncommon</option>
+                  <option value="Rare">Rare</option>
+                  <option value="Legendary">Legendary</option>
+                  <option value="Mythical">Mythical</option>
+                </select>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 font-mono">
+              Showing {cards.filter(c => {
+                if (filterCardUnit !== 'all' && c.unitId !== filterCardUnit) return false;
+                if (filterCardRarity !== 'all' && c.rarity !== filterCardRarity) return false;
+                return true;
+              }).length} cards
+            </p>
+          </div>
+
+          {/* Cards Table */}
+          <div className="space-y-3">
+            {cards
+              .filter(c => {
+                if (filterCardUnit !== 'all' && c.unitId !== filterCardUnit) return false;
+                if (filterCardRarity !== 'all' && c.rarity !== filterCardRarity) return false;
+                return true;
+              })
+              .map(card => {
+                return (
+                  <div
+                    key={card.cardId}
+                    className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+                      card.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl shrink-0">
+                        {card.symbol || '📜'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            card.rarity === 'Mythical' ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' :
+                            card.rarity === 'Legendary' ? 'bg-amber-500/20 text-amber-300 border-amber-400/40' :
+                            card.rarity === 'Rare' ? 'bg-blue-500/20 text-blue-300 border-blue-400/40' :
+                            card.rarity === 'Uncommon' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40' :
+                            'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {card.rarity}
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            {card.standardId}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {card.packTheme}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-100 font-serif">
+                          {card.name}
+                        </h4>
+                        <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                          {card.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleCardActive(card.cardId)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                          card.active
+                            ? 'bg-emerald-950/60 border-emerald-700 text-emerald-300 hover:bg-emerald-900/60'
+                            : 'bg-rose-950/60 border-rose-700 text-rose-300 hover:bg-rose-900/60'
+                        }`}
+                      >
+                        {card.active ? (
+                          <>
+                            <ToggleRight className="w-4 h-4 text-emerald-400" />
+                            <span>Active in Booster Packs</span>
+                          </>
+                        ) : (
+                          <>
+                            <ToggleLeft className="w-4 h-4 text-rose-400" />
+                            <span>Vaulted (Inactive)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
       )}
 
       {/* Add Custom Question Modal */}

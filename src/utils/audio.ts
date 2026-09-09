@@ -64,6 +64,92 @@ class SoundEffects {
     }
   }
 
+  // Pack opening tear / unwrapping sound
+  playPackRip() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      // White noise burst with filter sweep to simulate foil tearing
+      const bufferSize = ctx.sampleRate * 0.25;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(800, now);
+      filter.frequency.exponentialRampToValueAtTime(3200, now + 0.15);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+    } catch {
+      // AudioContext policy
+    }
+  }
+
+  // Card flip whoosh
+  playCardFlip() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(660, now + 0.1);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch {
+      // AudioContext policy
+    }
+  }
+
+  // Fanfare for Rare / Legendary / Mythical pulls
+  playFanfare(rarity: 'Rare' | 'Legendary' | 'Mythical') {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const notes = rarity === 'Mythical'
+        ? [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98] // C5 to G6 arpeggio
+        : rarity === 'Legendary'
+        ? [440.00, 554.37, 659.25, 880.00] // A4 to A5 major
+        : [392.00, 493.88, 587.33, 783.99]; // G4 to G5 major
+      
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = rarity === 'Mythical' ? 'sawtooth' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+        const volume = rarity === 'Mythical' ? 0.1 : 0.12;
+        gain.gain.setValueAtTime(volume, now + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.09);
+        osc.stop(now + idx * 0.09 + 0.4);
+      });
+    } catch {
+      // AudioContext policy
+    }
+  }
+
   // Pack / coin sound
   playCoin() {
     if (!this.enabled) return;

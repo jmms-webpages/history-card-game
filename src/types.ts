@@ -69,6 +69,9 @@ export interface Card {
   historicalEra: string;
   historicalSignificance: string;
   active: boolean;
+  category?: 'figure' | 'document' | 'event' | 'artifact';
+  symbol?: string;
+  flavorQuote?: string;
 }
 
 export interface Pack {

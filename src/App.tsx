@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QuestionsProvider } from './context/QuestionsContext';
+import { CardsProvider } from './context/CardsContext';
 import { NavigationTab } from './types';
 import { Navbar } from './components/Navbar';
 import { AuthView } from './components/AuthView';
@@ -56,8 +57,8 @@ const MainAppContent: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {(currentTab === 'dashboard' || currentTab === 'student-view') && <DashboardView onNavigate={setCurrentTab} />}
         {currentTab === 'questions' && <QuestionsView />}
-        {currentTab === 'packs' && <PacksView />}
-        {currentTab === 'collection' && <CollectionView />}
+        {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
+        {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
         {currentTab === 'trading' && <TradingView />}
         {currentTab === 'profile' && <ProfileView />}
         {currentTab === 'teacher' && <TeacherDashboardView />}
@@ -82,7 +83,9 @@ export default function App() {
   return (
     <AuthProvider>
       <QuestionsProvider>
-        <MainAppContent />
+        <CardsProvider>
+          <MainAppContent />
+        </CardsProvider>
       </QuestionsProvider>
     </AuthProvider>
   );
