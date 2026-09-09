@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useQuestions } from '../context/QuestionsContext';
 import { NavigationTab } from '../types';
 import { getAvatarById } from '../data/avatars';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
@@ -24,12 +25,13 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { userProfile, isTeacher } = useAuth();
+  const { dailyActivity, gameSettings } = useQuestions();
 
   if (!userProfile) return null;
 
   const currentAvatar = getAvatarById(userProfile.avatar);
-  const dailyAnswered = 0; // Ready for Phase 2 Firestore dailyActivity integration
-  const dailyLimit = 25;
+  const dailyAnswered = dailyActivity.questionsAnswered;
+  const dailyLimit = gameSettings.dailyQuestionLimit;
 
   return (
     <div className="space-y-8 pb-12">

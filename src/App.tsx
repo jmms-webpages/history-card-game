@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { QuestionsProvider } from './context/QuestionsContext';
 import { NavigationTab } from './types';
 import { Navbar } from './components/Navbar';
 import { AuthView } from './components/AuthView';
@@ -19,8 +20,14 @@ import { TeacherDashboardView } from './components/TeacherDashboardView';
 const MainAppContent: React.FC = () => {
   const { userProfile, loading } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
+  const [timedOut, setTimedOut] = useState(false);
 
-  if (loading) {
+  React.useEffect(() => {
+    const timer = setTimeout(() => setTimedOut(true), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading && !userProfile && !timedOut) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-100">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl animate-bounce shadow-xl">
@@ -74,7 +81,9 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <MainAppContent />
+      <QuestionsProvider>
+        <MainAppContent />
+      </QuestionsProvider>
     </AuthProvider>
   );
 }

@@ -1,36 +1,102 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { INITIAL_UNITS, INITIAL_STANDARDS, DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
+import { useQuestions } from '../context/QuestionsContext';
+import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { 
   GraduationCap, 
   ShieldCheck, 
-  Settings, 
   BookOpen, 
-  Coins, 
-  Sparkles, 
   HelpCircle, 
   Plus, 
   Check, 
   Sliders,
   Users,
-  Eye
+  Eye,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Filter
 } from 'lucide-react';
+import { Question } from '../types';
 
 export const TeacherDashboardView: React.FC = () => {
   const { userProfile, isTeacher, isAdmin, setStudentViewMode } = useAuth();
+  const { 
+    questions, 
+    gameSettings, 
+    updateGameSettings, 
+    addQuestion, 
+    toggleQuestionActive, 
+    deleteQuestion 
+  } = useQuestions();
   
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'economy'>('overview');
-  const [dailyLimit, setDailyLimit] = useState(DEFAULT_GAME_SETTINGS.dailyQuestionLimit);
-  const [correctReward, setCorrectReward] = useState(DEFAULT_GAME_SETTINGS.correctCoinReward);
-  const [incorrectReward, setIncorrectReward] = useState(DEFAULT_GAME_SETTINGS.incorrectCoinReward);
-  const [packCost, setPackCost] = useState(DEFAULT_GAME_SETTINGS.standardPackCost);
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'questions' | 'economy'>('overview');
+  
+  // Economy form state
+  const [dailyLimit, setDailyLimit] = useState(gameSettings.dailyQuestionLimit);
+  const [correctReward, setCorrectReward] = useState(gameSettings.correctCoinReward);
+  const [incorrectReward, setIncorrectReward] = useState(gameSettings.incorrectCoinReward);
+  const [packCost, setPackCost] = useState(gameSettings.standardPackCost);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // Question bank filter & modal state
+  const [filterUnit, setFilterUnit] = useState<string>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newQText, setNewQText] = useState('');
+  const [newAnswers, setNewAnswers] = useState(['', '', '', '']);
+  const [newCorrectIdx, setNewCorrectIdx] = useState(0);
+  const [newExplanation, setNewExplanation] = useState('');
+  const [newUnitId, setNewUnitId] = useState('unit-1');
+  const [newStandardId, setNewStandardId] = useState('OH-SS8-2026.1');
+  const [newDifficulty, setNewDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [newTopic, setNewTopic] = useState('');
 
   const handleSaveEconomy = (e: React.FormEvent) => {
     e.preventDefault();
+    updateGameSettings({
+      dailyQuestionLimit: Number(dailyLimit),
+      correctCoinReward: Number(correctReward),
+      incorrectCoinReward: Number(incorrectReward),
+      standardPackCost: Number(packCost)
+    });
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 3000);
   };
+
+  const handleCreateQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newQText.trim() || newAnswers.some(a => !a.trim())) return;
+
+    const unitObj = INITIAL_UNITS.find(u => u.unitId === newUnitId);
+    const standardObj = INITIAL_STANDARDS.find(s => s.standardId === newStandardId);
+
+    addQuestion({
+      questionText: newQText.trim(),
+      answers: newAnswers.map(a => a.trim()),
+      correctAnswer: newCorrectIdx,
+      explanation: newExplanation.trim() || 'Curriculum concept verified by Ohio 8th Grade Social Studies educator.',
+      unitId: newUnitId,
+      unitName: unitObj?.unitName || 'Custom Unit',
+      standardId: newStandardId,
+      standardDescription: standardObj?.standardDescription,
+      topic: newTopic.trim() || 'Ohio History Concepts',
+      historicalEra: 'Early America (1492–1877)',
+      difficulty: newDifficulty,
+      active: true
+    });
+
+    // Reset form
+    setNewQText('');
+    setNewAnswers(['', '', '', '']);
+    setNewExplanation('');
+    setNewTopic('');
+    setShowAddModal(false);
+  };
+
+  const filteredQuestions = questions.filter(q => {
+    if (filterUnit !== 'all' && q.unitId !== filterUnit) return false;
+    return true;
+  });
 
   if (!isTeacher) {
     return (
@@ -45,13 +111,13 @@ export const TeacherDashboardView: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 pb-16">
       
       {/* Teacher Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0">
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
@@ -72,6 +138,7 @@ export const TeacherDashboardView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               id="admin-launch-student-view"
+              type="button"
               onClick={() => setStudentViewMode(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-950/80 border border-emerald-700 text-emerald-300 hover:bg-emerald-900/90 transition-all cursor-pointer shadow-sm"
               title="Switch directly into student view mode"
@@ -90,68 +157,206 @@ export const TeacherDashboardView: React.FC = () => {
         {/* Sub-navigation tabs */}
         <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-slate-800 text-xs font-medium">
           <button
+            type="button"
             onClick={() => setActiveSubTab('overview')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               activeSubTab === 'overview' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
             Overview & Stats
           </button>
           <button
+            type="button"
+            onClick={() => setActiveSubTab('questions')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+              activeSubTab === 'questions' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Question Bank ({questions.length})
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveSubTab('units')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               activeSubTab === 'units' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
             Curriculum Units ({INITIAL_UNITS.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('standards')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               activeSubTab === 'standards' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
             Ohio Standards ({INITIAL_STANDARDS.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('economy')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               activeSubTab === 'economy' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            Coin Economy & Daily Limits
+            Coin Economy & Limits
           </button>
         </div>
       </div>
 
       {/* Overview Tab */}
       {activeSubTab === 'overview' && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span>Ohio Curriculum Units</span>
-              <BookOpen className="w-4 h-4 text-amber-400" />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Active Questions</span>
+                <HelpCircle className="w-4 h-4 text-amber-400" />
+              </div>
+              <p className="text-3xl font-black text-slate-100 font-mono">
+                {questions.filter(q => q.active).length}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Ready for student trivia</p>
             </div>
-            <p className="text-3xl font-black text-slate-100 font-mono">{INITIAL_UNITS.length}</p>
-            <p className="text-xs text-slate-400 mt-1">Pre-colonial to Reconstruction</p>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Curriculum Units</span>
+                <BookOpen className="w-4 h-4 text-amber-400" />
+              </div>
+              <p className="text-3xl font-black text-slate-100 font-mono">{INITIAL_UNITS.length}</p>
+              <p className="text-xs text-slate-400 mt-1">1492 to Reconstruction</p>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>2026 Standards</span>
+                <Sliders className="w-4 h-4 text-amber-400" />
+              </div>
+              <p className="text-3xl font-black text-slate-100 font-mono">{INITIAL_STANDARDS.length}</p>
+              <p className="text-xs text-slate-400 mt-1">Full state alignment</p>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Classroom Privacy</span>
+                <Users className="w-4 h-4 text-emerald-400" />
+              </div>
+              <p className="text-xl font-bold text-emerald-400 font-mono">FERPA Safe</p>
+              <p className="text-xs text-slate-400 mt-1">Zero public student PII</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Question Bank Tab */}
+      {activeSubTab === 'questions' && (
+        <div className="space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-slate-300 font-medium">Filter Unit:</span>
+              <select
+                value={filterUnit}
+                onChange={(e) => setFilterUnit(e.target.value)}
+                className="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400"
+              >
+                <option value="all">All Units ({questions.length})</option>
+                {INITIAL_UNITS.map(u => (
+                  <option key={u.unitId} value={u.unitId}>
+                    {u.unitName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Custom Question</span>
+            </button>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span>Updated 2026 Standards</span>
-              <HelpCircle className="w-4 h-4 text-amber-400" />
-            </div>
-            <p className="text-3xl font-black text-slate-100 font-mono">{INITIAL_STANDARDS.length}</p>
-            <p className="text-xs text-slate-400 mt-1">Ready for transition year 2026–2027</p>
-          </div>
+          {/* Question List */}
+          <div className="space-y-3">
+            {filteredQuestions.map((q, idx) => (
+              <div 
+                key={q.questionId}
+                className={`bg-slate-900 border rounded-xl p-4 sm:p-5 transition-all ${
+                  q.active ? 'border-slate-800' : 'border-slate-800/40 opacity-60 bg-slate-950/40'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-amber-400 px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
+                        {q.standardId}
+                      </span>
+                      <span className="text-[11px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        {q.topic}
+                      </span>
+                      <span className="text-[10px] uppercase font-semibold text-slate-400">
+                        {q.difficulty}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-100">
+                      {idx + 1}. {q.questionText}
+                    </p>
+                    
+                    {/* Answers pills */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2">
+                      {q.answers.map((ans, aIdx) => (
+                        <div 
+                          key={aIdx}
+                          className={`text-xs p-2 rounded-lg border ${
+                            aIdx === q.correctAnswer 
+                              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200 font-medium'
+                              : 'bg-slate-950/60 border-slate-800/60 text-slate-400'
+                          }`}
+                        >
+                          <span className="font-mono mr-1.5 text-slate-500">
+                            {String.fromCharCode(65 + aIdx)}.
+                          </span>
+                          {ans}
+                          {aIdx === q.correctAnswer && (
+                            <span className="ml-2 text-[10px] text-emerald-400 font-bold uppercase">(Correct)</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span>Classroom Safety</span>
-              <Users className="w-4 h-4 text-emerald-400" />
-            </div>
-            <p className="text-xl font-bold text-emerald-400 font-mono">FERPA Safe</p>
-            <p className="text-xs text-slate-400 mt-1">No public academic rank lists or student emails</p>
+                    <p className="text-[11px] text-slate-400 pt-2 italic">
+                      💡 {q.explanation}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex sm:flex-col items-center gap-2 shrink-0 self-end sm:self-start">
+                    <button
+                      type="button"
+                      onClick={() => toggleQuestionActive(q.questionId)}
+                      title={q.active ? 'Deactivate question' : 'Activate question'}
+                      className="p-1.5 text-xs text-slate-400 hover:text-amber-400 cursor-pointer"
+                    >
+                      {q.active ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
+                    </button>
+                    {q.questionId.startsWith('q-custom-') && (
+                      <button
+                        type="button"
+                        onClick={() => deleteQuestion(q.questionId)}
+                        title="Delete custom question"
+                        className="p-1.5 text-xs text-rose-400 hover:text-rose-300 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -161,7 +366,7 @@ export const TeacherDashboardView: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-100 text-base">Classroom Curriculum Units</h3>
-            <span className="text-xs text-slate-400 font-mono">Editable in Phase 5</span>
+            <span className="text-xs text-slate-400 font-mono">Ohio 8th Grade Scope</span>
           </div>
           <div className="space-y-2.5">
             {INITIAL_UNITS.map((unit) => (
@@ -183,19 +388,17 @@ export const TeacherDashboardView: React.FC = () => {
       {activeSubTab === 'standards' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-slate-100 text-base">2026 Ohio 8th Grade Social Studies Standards</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Every trivia question and card links to these standards.</p>
-            </div>
+            <h3 className="font-bold text-slate-100 text-base">Ohio 8th Grade Social Studies Standards (2026)</h3>
+            <span className="text-xs text-slate-400 font-mono">Transition Curriculum</span>
           </div>
           <div className="space-y-2.5">
             {INITIAL_STANDARDS.map((std) => (
-              <div key={std.standardId} className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                <div className="flex items-center justify-between text-amber-400 font-mono font-bold mb-1">
-                  <span>{std.standardId}</span>
-                  <span className="text-slate-400 font-sans">{std.topic}</span>
+              <div key={std.standardId} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-amber-400">{std.standardId}</span>
+                  <span className="text-[11px] text-slate-400">{std.topic}</span>
                 </div>
-                <p className="text-slate-300 leading-relaxed">{std.standardDescription}</p>
+                <p className="text-xs text-slate-300">{std.standardDescription}</p>
               </div>
             ))}
           </div>
@@ -204,15 +407,18 @@ export const TeacherDashboardView: React.FC = () => {
 
       {/* Economy Tab */}
       {activeSubTab === 'economy' && (
-        <form onSubmit={handleSaveEconomy} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+        <form onSubmit={handleSaveEconomy} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-slate-100 text-base">Configurable Game Economy & Daily Limits</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Control question caps and coin values for your classroom.</p>
+              <h3 className="font-bold text-slate-100 text-base">Classroom Economy & Daily Caps</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tune questions per day and reward values to match your classroom pacing.
+              </p>
             </div>
             {savedNotice && (
-              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 bg-emerald-950/60 border border-emerald-800 px-2.5 py-1 rounded-full">
-                <Check className="w-3.5 h-3.5" /> Saved!
+              <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/80 border border-emerald-700 text-emerald-300 rounded-lg text-xs font-bold animate-pulse">
+                <Check className="w-3.5 h-3.5" />
+                <span>Settings Saved!</span>
               </span>
             )}
           </div>
@@ -228,7 +434,7 @@ export const TeacherDashboardView: React.FC = () => {
                 max={100}
                 value={dailyLimit}
                 onChange={(e) => setDailyLimit(Number(e.target.value))}
-                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono"
+                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:border-amber-400 focus:outline-none"
               />
               <p className="text-[11px] text-slate-500 mt-1">Default: 25 questions per day.</p>
             </div>
@@ -243,7 +449,7 @@ export const TeacherDashboardView: React.FC = () => {
                 max={500}
                 value={packCost}
                 onChange={(e) => setPackCost(Number(e.target.value))}
-                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono"
+                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:border-amber-400 focus:outline-none"
               />
               <p className="text-[11px] text-slate-500 mt-1">Default: 100 coins for a 5-card booster pack.</p>
             </div>
@@ -258,7 +464,7 @@ export const TeacherDashboardView: React.FC = () => {
                 max={50}
                 value={correctReward}
                 onChange={(e) => setCorrectReward(Number(e.target.value))}
-                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono text-emerald-400"
+                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono text-emerald-400 focus:border-amber-400 focus:outline-none"
               />
               <p className="text-[11px] text-slate-500 mt-1">Default: +10 coins.</p>
             </div>
@@ -273,7 +479,7 @@ export const TeacherDashboardView: React.FC = () => {
                 max={25}
                 value={incorrectReward}
                 onChange={(e) => setIncorrectReward(Number(e.target.value))}
-                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono text-amber-400"
+                className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono text-amber-400 focus:border-amber-400 focus:outline-none"
               />
               <p className="text-[11px] text-slate-500 mt-1">Default: +3 coins (coins are never deducted).</p>
             </div>
@@ -281,12 +487,175 @@ export const TeacherDashboardView: React.FC = () => {
 
           <button
             type="submit"
-            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow"
           >
             <Sliders className="w-3.5 h-3.5" />
             <span>Apply Economy Settings</span>
           </button>
         </form>
+      )}
+
+      {/* Add Custom Question Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-slate-100 text-base">Add New Ohio History Question</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-white text-xs"
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateQuestion} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Question Prompt
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={newQText}
+                  onChange={(e) => setNewQText(e.target.value)}
+                  placeholder="e.g. Which Ohio river city served as a major station on the Underground Railroad?"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              {/* 4 Answers */}
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-300">
+                  Multiple Choice Answers (Select Correct Choice)
+                </label>
+                {newAnswers.map((ans, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="correctAnswerChoice"
+                      checked={newCorrectIdx === idx}
+                      onChange={() => setNewCorrectIdx(idx)}
+                      className="text-amber-500 focus:ring-amber-400 h-4 w-4"
+                    />
+                    <span className="text-xs font-mono text-slate-400 w-4">
+                      {String.fromCharCode(65 + idx)}.
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={ans}
+                      onChange={(e) => {
+                        const copy = [...newAnswers];
+                        copy[idx] = e.target.value;
+                        setNewAnswers(copy);
+                      }}
+                      placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Unit & Standard */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Curriculum Unit
+                  </label>
+                  <select
+                    value={newUnitId}
+                    onChange={(e) => setNewUnitId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:border-amber-400 focus:outline-none"
+                  >
+                    {INITIAL_UNITS.map(u => (
+                      <option key={u.unitId} value={u.unitId}>
+                        {u.unitName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Standard Alignment
+                  </label>
+                  <select
+                    value={newStandardId}
+                    onChange={(e) => setNewStandardId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:border-amber-400 focus:outline-none"
+                  >
+                    {INITIAL_STANDARDS.map(s => (
+                      <option key={s.standardId} value={s.standardId}>
+                        {s.standardId} - {s.topic}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Topic
+                  </label>
+                  <input
+                    type="text"
+                    value={newTopic}
+                    onChange={(e) => setNewTopic(e.target.value)}
+                    placeholder="e.g. Underground Railroad in Ripley"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Difficulty
+                  </label>
+                  <select
+                    value={newDifficulty}
+                    onChange={(e) => setNewDifficulty(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:border-amber-400 focus:outline-none"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Historical Explanation (Shown after answering)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newExplanation}
+                  onChange={(e) => setNewExplanation(e.target.value)}
+                  placeholder="Explain why the answer is correct and cite historical context..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow"
+                >
+                  Save to Question Bank
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
     </div>

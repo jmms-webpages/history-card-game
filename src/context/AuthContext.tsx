@@ -119,17 +119,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<UserProfile> => {
     let existingData: Partial<UserProfile> = {};
     
-    // Try reading from Firestore
-    try {
-      if (db && doc) {
+    // Try reading from Firestore only when live Firebase is configured with strict timeout
+    if (isFirebaseConfigured && db && doc) {
+      try {
         const userRef = doc(db, 'users', uid);
-        const snapshot = await getDoc(userRef);
-        if (snapshot.exists()) {
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+        const snapshot = await Promise.race([getDoc(userRef), timeoutPromise]) as any;
+        if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
           existingData = snapshot.data() as Partial<UserProfile>;
         }
+      } catch (e) {
+        console.warn("Firestore fetch notice (using cached profile):", e);
       }
-    } catch (e) {
-      console.warn("Firestore fetch notice (using cached profile):", e);
     }
 
     const now = new Date().toISOString();
@@ -151,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: existingData.avatar || fallbackData.avatar || (isAdminUser ? 'washington' : 'franklin'),
       classroomCode: existingData.classroomCode || fallbackData.classroomCode || 'OHIO-8A',
       role,
-      coins: typeof existingData.coins === 'number' ? existingData.coins : (fallbackData.coins ?? (isAdminUser ? 500 : 50)),
+      coins: typeof existingData.coins === 'number' ? existingData.coins : (fallbackData.coins ?? (isAdminUser ? 1000 : 50)),
       email: emailToCheck || undefined,
       createdAt: existingData.createdAt || now,
       lastLoginAt: now,
@@ -159,14 +160,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uniqueCardsCollected: existingData.uniqueCardsCollected ?? 0
     };
 
-    // Try saving to Firestore if live Firebase is active
-    try {
-      if (isFirebaseConfigured && db && doc) {
-        const userRef = doc(db, 'users', uid);
-        await setDoc(userRef, combinedProfile, { merge: true });
-      }
-    } catch (e) {
-      console.warn("Firestore write notice (saved to local cache):", e);
+    // Try saving to Firestore asynchronously if live Firebase is active
+    if (isFirebaseConfigured && db && doc) {
+      const userRef = doc(db, 'users', uid);
+      setDoc(userRef, combinedProfile, { merge: true }).catch(e => {
+        console.warn("Async firestore write notice:", e);
+      });
     }
 
     saveProfileLocally(combinedProfile);
