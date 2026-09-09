@@ -1,0 +1,6 @@
+{
+  "name": "History Card Quest",
+  "description": "An educational trading-card quest game for 8th grade Ohio Social Studies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

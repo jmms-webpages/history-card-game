@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'])
+      );
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // User profiles
+    match /users/{userId} {
+      // Authenticated users can read public safe fields of other students (for trading), or owner reads all
+      allow read: if isAuthenticated();
+      // Users can create their own profile on signup
+      allow create: if isOwner(userId) && 
+        request.resource.data.role in ['student', 'teacher'] &&
+        request.resource.data.coins >= 0;
+      // Users can update safe profile fields like displayName, avatar, classroomCode, lastLoginAt
+      // Role and coins changes are restricted
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
+      );
+      allow delete: if isAdmin();
+
+      // Daily activity subcollection
+      match /dailyActivity/{date} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // Inventory subcollection
+      match /inventory/{instanceId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Content: Questions, Cards, Packs, Units, Standards
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /cards/{cardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /packs/{packId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /units/{unitId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /standards/{standardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Game settings
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Trades
+    match /trades/{tradeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "projectId": "history-card-quest-app",
+  "appId": "1:276960982650:web:mock-app-id",
+  "storageBucket": "history-card-quest-app.firebasestorage.app",
+  "apiKey": "mock-api-key",
+  "authDomain": "history-card-quest-app.firebaseapp.com"
+}

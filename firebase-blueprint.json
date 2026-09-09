@@ -1,0 +1,199 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student or Teacher profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatar": { "type": "string" },
+        "classroomCode": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin"] },
+        "coins": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["uid", "displayName", "role", "coins"]
+    },
+    "DailyActivity": {
+      "title": "DailyActivity",
+      "description": "Student daily question answers and limits",
+      "type": "object",
+      "properties": {
+        "questionsAnswered": { "type": "number" },
+        "correctAnswers": { "type": "number" },
+        "coinsEarned": { "type": "number" },
+        "lastQuestionAt": { "type": "string" }
+      },
+      "required": ["questionsAnswered", "correctAnswers", "coinsEarned"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Historical trivia question aligned to Ohio 8th Grade standards",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "questionText": { "type": "string" },
+        "answers": { "type": "array" },
+        "correctAnswer": { "type": "number" },
+        "explanation": { "type": "string" },
+        "standardId": { "type": "string" },
+        "standardDescription": { "type": "string" },
+        "unitId": { "type": "string" },
+        "unitName": { "type": "string" },
+        "topic": { "type": "string" },
+        "historicalEra": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+        "active": { "type": "boolean" }
+      },
+      "required": ["questionId", "questionText", "answers", "correctAnswer", "unitId", "active"]
+    },
+    "Card": {
+      "title": "Card",
+      "description": "Collectible historical figure, event, document, or artifact card",
+      "type": "object",
+      "properties": {
+        "cardId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "rarity": { "type": "string", "enum": ["Common", "Uncommon", "Rare", "Legendary", "Mythical"] },
+        "packTheme": { "type": "string" },
+        "unitId": { "type": "string" },
+        "standardId": { "type": "string" },
+        "historicalEra": { "type": "string" },
+        "historicalSignificance": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["cardId", "name", "rarity", "packTheme", "active"]
+    },
+    "Pack": {
+      "title": "Pack",
+      "description": "Historical card pack for purchase with coins",
+      "type": "object",
+      "properties": {
+        "packId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "theme": { "type": "string" },
+        "cost": { "type": "number" },
+        "cardCount": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["packId", "name", "cost", "theme", "active"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Card instance owned by a user",
+      "type": "object",
+      "properties": {
+        "instanceId": { "type": "string" },
+        "cardId": { "type": "string" },
+        "obtainedAt": { "type": "string" },
+        "isDuplicate": { "type": "boolean" }
+      },
+      "required": ["instanceId", "cardId", "obtainedAt"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "Student-to-student card trade proposal",
+      "type": "object",
+      "properties": {
+        "tradeId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "receiverName": { "type": "string" },
+        "offeredCardIds": { "type": "array" },
+        "requestedCardIds": { "type": "array" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "cancelled"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["tradeId", "senderId", "receiverId", "status"]
+    },
+    "Unit": {
+      "title": "Unit",
+      "description": "Curriculum Unit for Ohio 8th Grade Social Studies",
+      "type": "object",
+      "properties": {
+        "unitId": { "type": "string" },
+        "unitName": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["unitId", "unitName", "active"]
+    },
+    "Standard": {
+      "title": "Standard",
+      "description": "Ohio Social Studies Standard (2026 update ready)",
+      "type": "object",
+      "properties": {
+        "standardId": { "type": "string" },
+        "standardDescription": { "type": "string" },
+        "unitId": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["standardId", "standardDescription", "active"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Configurable game economics and rules",
+      "type": "object",
+      "properties": {
+        "dailyQuestionLimit": { "type": "number" },
+        "correctCoinReward": { "type": "number" },
+        "incorrectCoinReward": { "type": "number" },
+        "standardPackCost": { "type": "number" },
+        "duplicateSellValues": { "type": "object" },
+        "rarityProbabilities": { "type": "object" },
+        "adminUids": { "type": "array" }
+      },
+      "required": ["dailyQuestionLimit", "correctCoinReward", "incorrectCoinReward"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with coins, role, safe avatar, and display name"
+    },
+    "/users/{userId}/dailyActivity/{date}": {
+      "schema": "DailyActivity",
+      "description": "Daily question count and limit tracking"
+    },
+    "/users/{userId}/inventory/{instanceId}": {
+      "schema": "InventoryItem",
+      "description": "Student owned cards"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Historical trivia questions"
+    },
+    "/cards/{cardId}": {
+      "schema": "Card",
+      "description": "Collectible historical cards"
+    },
+    "/packs/{packId}": {
+      "schema": "Pack",
+      "description": "Packs available for purchase"
+    },
+    "/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "Trade requests between students"
+    },
+    "/units/{unitId}": {
+      "schema": "Unit",
+      "description": "Teacher configurable curriculum units"
+    },
+    "/standards/{standardId}": {
+      "schema": "Standard",
+      "description": "Teacher configurable standards"
+    },
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Game settings and admin permissions"
+    }
+  }
+}
