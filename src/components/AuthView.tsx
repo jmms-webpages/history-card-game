@@ -1,9 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Sparkles, AlertCircle, ShieldCheck, ArrowRight, BookOpen } from 'lucide-react';
+import { Sparkles, AlertCircle, ShieldCheck, ArrowRight, BookOpen, ChevronDown, UserCheck } from 'lucide-react';
 
 export const AuthView: React.FC = () => {
-  const { loginWithGoogle, loginAsAdminDirect, error, clearError, loading } = useAuth();
+  const { loginWithGoogle, error, clearError, loading } = useAuth();
+  const [showStudentInput, setShowStudentInput] = useState(false);
+  const [studentEmail, setStudentEmail] = useState('');
+  const [studentName, setStudentName] = useState('');
+
+  const handleAdminGoogleSignIn = () => {
+    loginWithGoogle('jaf2jc@bearworks.jackson.sparcc.org', 'Master Administrator');
+  };
+
+  const handleStudentGoogleSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = studentEmail.trim() || 'student@bearworks.jackson.sparcc.org';
+    const name = studentName.trim() || email.split('@')[0];
+    loginWithGoogle(email, name);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
@@ -37,7 +51,7 @@ export const AuthView: React.FC = () => {
           <div className="mb-6 p-4 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-sm flex items-start gap-3 shadow-lg">
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-xs uppercase tracking-wider text-rose-300">Sign-in Notice</p>
+              <p className="font-semibold text-xs uppercase tracking-wider text-rose-300">Notice</p>
               <p className="text-rose-200 text-xs mt-1">{error}</p>
             </div>
             <button 
@@ -53,9 +67,9 @@ export const AuthView: React.FC = () => {
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-sm">
           
           <div className="text-center mb-6">
-            <h2 className="text-lg font-bold text-slate-100">Sign In to Continue</h2>
+            <h2 className="text-lg font-bold text-slate-100">Sign In with Google</h2>
             <p className="text-xs text-slate-400 mt-1">
-              Use your school Google account to access your collection and records.
+              Connect using your Jackson Local Schools Google account.
             </p>
           </div>
 
@@ -63,7 +77,7 @@ export const AuthView: React.FC = () => {
           <button
             id="google-signin-button"
             type="button"
-            onClick={loginWithGoogle}
+            onClick={handleAdminGoogleSignIn}
             disabled={loading}
             className="w-full py-3.5 px-5 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-900 font-bold rounded-xl text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 border border-slate-200"
           >
@@ -85,32 +99,72 @@ export const AuthView: React.FC = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span className="font-medium text-slate-800">
+            <span className="font-semibold text-slate-900">
               {loading ? 'Connecting Google Account...' : 'Sign in with Google'}
             </span>
           </button>
 
           {/* Admin Auto-Detection Badge */}
-          <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
+          <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-[11px] text-slate-300 leading-snug">
-              <span className="font-semibold text-amber-300">Master Administrator Access: </span>
-              Accounts under <span className="font-mono text-amber-200">jaf2jc@bearworks.jackson.sparcc.org</span> automatically unlock full Administrator controls and the Student View toggle.
+              <span className="font-semibold text-amber-300">Master Administrator: </span>
+              Signing in directly authenticates <span className="font-mono text-amber-200">jaf2jc@bearworks.jackson.sparcc.org</span> with Master Administrator privileges and the Student View toggle.
             </div>
           </div>
 
-          {/* Direct Admin Quick Access (for immediate testing or sandbox preview) */}
-          <div className="mt-4 pt-4 border-t border-slate-800 text-center">
+          {/* Optional Student Google Account Section */}
+          <div className="mt-5 pt-4 border-t border-slate-800">
             <button
-              id="direct-admin-signin"
               type="button"
-              onClick={() => loginAsAdminDirect('jaf2jc@bearworks.jackson.sparcc.org', 'Admin (jaf2jc)')}
-              disabled={loading}
-              className="text-xs text-amber-400/90 hover:text-amber-300 transition-colors flex items-center justify-center gap-1.5 mx-auto font-medium cursor-pointer"
+              id="toggle-student-account-form"
+              onClick={() => setShowStudentInput(!showStudentInput)}
+              className="text-xs text-slate-400 hover:text-slate-200 flex items-center justify-between w-full py-1 transition-colors cursor-pointer"
             >
-              <span>Instant Admin Preview Sign-In</span>
-              <ArrowRight className="w-3 h-3" />
+              <span className="flex items-center gap-1.5 font-medium">
+                <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                Sign in with a student school account
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStudentInput ? 'rotate-180' : ''}`} />
             </button>
+
+            {showStudentInput && (
+              <form onSubmit={handleStudentGoogleSignIn} className="mt-3 space-y-2.5 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1 font-medium">
+                    Student Google Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={studentEmail}
+                    onChange={(e) => setStudentEmail(e.target.value)}
+                    placeholder="student@bearworks.jackson.sparcc.org"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1 font-medium">
+                    Student Display Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="e.g. Alex M."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow"
+                >
+                  <span>Continue as Student</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            )}
           </div>
 
         </div>

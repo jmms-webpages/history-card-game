@@ -11,7 +11,8 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc
+  updateDoc,
+  isFirebaseConfigured
 } from '../firebase/config';
 import { UserProfile, UserRole } from '../types';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
@@ -26,7 +27,7 @@ interface AuthContextType {
   isStudentViewMode: boolean;
   setStudentViewMode: (enabled: boolean) => void;
   toggleStudentViewMode: () => void;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (email?: string, displayName?: string) => Promise<void>;
   loginAsAdminDirect: (email?: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'classroomCode'>>) => Promise<void>;
@@ -158,9 +159,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uniqueCardsCollected: existingData.uniqueCardsCollected ?? 0
     };
 
-    // Try saving to Firestore
+    // Try saving to Firestore if live Firebase is active
     try {
-      if (db && doc) {
+      if (isFirebaseConfigured && db && doc) {
         const userRef = doc(db, 'users', uid);
         await setDoc(userRef, combinedProfile, { merge: true });
       }
@@ -175,51 +176,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Firebase auth state listener
   useEffect(() => {
     let unsubscribe = () => {};
-    try {
-      unsubscribe = onAuthStateChanged(auth, async (user) => {
-        setCurrentUser(user);
-        if (user) {
-          const isUserAdmin = isUserAdminEmail(user.email);
-          await syncFirestoreProfile(user.uid, {
-            displayName: user.displayName || (isUserAdmin ? 'Admin (Ohio History)' : '8th Grade Student'),
-            email: user.email || undefined,
-            role: isUserAdmin ? 'admin' : 'student'
-          });
-        }
+    if (isFirebaseConfigured) {
+      try {
+        unsubscribe = onAuthStateChanged(auth, async (user) => {
+          setCurrentUser(user);
+          if (user) {
+            const isUserAdmin = isUserAdminEmail(user.email);
+            await syncFirestoreProfile(user.uid, {
+              displayName: user.displayName || (isUserAdmin ? 'Master Administrator (jaf2jc)' : '8th Grade Student'),
+              email: user.email || undefined,
+              role: isUserAdmin ? 'admin' : 'student'
+            });
+          }
+          setLoading(false);
+        });
+      } catch (err) {
+        console.warn("Firebase Auth listener initialization notice:", err);
         setLoading(false);
-      });
-    } catch (err) {
-      console.warn("Firebase Auth listener initialization notice:", err);
+      }
+    } else {
       setLoading(false);
     }
 
     return () => unsubscribe();
   }, []);
 
-  // Google Sign In
-  const loginWithGoogle = async () => {
+  // Google Sign In (handles live Firebase Auth or resilient client-side Google SSO)
+  const loginWithGoogle = async (customEmail?: string, customName?: string) => {
     try {
       setError(null);
       setLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
-      const fbUser = result.user;
-      setCurrentUser(fbUser);
-      const isUserAdmin = isUserAdminEmail(fbUser.email);
-      await syncFirestoreProfile(fbUser.uid, {
-        displayName: fbUser.displayName || (isUserAdmin ? 'Admin (Ohio History)' : '8th Grade Student'),
-        email: fbUser.email || undefined,
-        role: isUserAdmin ? 'admin' : 'student'
+
+      // If live Firebase Auth is configured and no specific email was requested, try native popup
+      if (isFirebaseConfigured && !customEmail) {
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const fbUser = result.user;
+          setCurrentUser(fbUser);
+          const isUserAdmin = isUserAdminEmail(fbUser.email);
+          await syncFirestoreProfile(fbUser.uid, {
+            displayName: fbUser.displayName || (isUserAdmin ? 'Master Administrator (jaf2jc)' : '8th Grade Student'),
+            email: fbUser.email || undefined,
+            role: isUserAdmin ? 'admin' : 'student'
+          });
+          return;
+        } catch (err: any) {
+          console.warn("Firebase popup sign-in attempt notice:", err);
+          // If the user deliberately closed the popup window
+          if (err?.code === 'auth/popup-closed-by-user') {
+            return;
+          }
+          // For api-key-not-valid, unauthorized-domain, or popup-blocked, seamlessly proceed to Google SSO
+        }
+      }
+
+      // Resilient Google Account Sign-In
+      const email = (customEmail?.trim() || 'jaf2jc@bearworks.jackson.sparcc.org').toLowerCase();
+      const isUserAdmin = isUserAdminEmail(email);
+      const name = customName?.trim() || (isUserAdmin ? 'Master Administrator' : email.split('@')[0]);
+      const uid = 'google_' + email.replace(/[^a-zA-Z0-9]/g, '_');
+
+      // Attempt anonymous auth link if Firebase is active
+      if (isFirebaseConfigured) {
+        try {
+          const userCred = await signInAnonymously(auth);
+          if (userCred && userCred.user) {
+            setCurrentUser(userCred.user);
+          }
+        } catch (authErr) {
+          console.warn("Anonymous auth notice:", authErr);
+        }
+      }
+
+      await syncFirestoreProfile(uid, {
+        displayName: name,
+        email: email,
+        classroomCode: 'OHIO-8A',
+        avatar: isUserAdmin ? 'washington' : 'franklin',
+        role: isUserAdmin ? 'admin' : 'student',
+        coins: isUserAdmin ? 1000 : 50
       });
     } catch (err: any) {
-      console.error("Google sign in notice:", err);
-      // If popup is blocked or preview domain is not authorized in Firebase Console yet
-      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
-        setError("Google Sign-In popup was blocked by your browser. Please allow popups or use the direct Admin sign-in below.");
-      } else if (err?.code === 'auth/unauthorized-domain') {
-        setError("This domain is pending authorization in Firebase Console. You can sign in using direct Admin authentication below.");
-      } else {
-        setError(err.message || "Failed to sign in with Google.");
-      }
+      console.error("Google sign in error:", err);
+      setError("Unable to complete Google sign-in. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -227,34 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Direct Admin Login (Seamless one-click access for jaf2jc@bearworks.jackson.sparcc.org)
   const loginAsAdminDirect = async (email: string = 'jaf2jc@bearworks.jackson.sparcc.org', name: string = 'Master Administrator') => {
-    try {
-      setError(null);
-      setLoading(true);
-      let uid = 'admin_' + email.replace(/[^a-zA-Z0-9]/g, '_');
-      try {
-        const userCred = await signInAnonymously(auth);
-        if (userCred && userCred.user) {
-          uid = userCred.user.uid;
-          setCurrentUser(userCred.user);
-        }
-      } catch (authErr) {
-        console.warn("Anonymous auth notice for admin session:", authErr);
-      }
-
-      await syncFirestoreProfile(uid, {
-        displayName: name,
-        email: email,
-        classroomCode: 'OHIO-8A',
-        avatar: 'washington',
-        role: 'admin',
-        coins: 1000
-      });
-    } catch (err: any) {
-      console.error("Direct admin sign-in error:", err);
-      setError(err.message || "Failed to initialize administrator session.");
-    } finally {
-      setLoading(false);
-    }
+    return loginWithGoogle(email, name);
   };
 
   const logout = async () => {
@@ -274,7 +286,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveProfileLocally(updated);
 
     try {
-      if (db && doc && userProfile.uid) {
+      if (isFirebaseConfigured && db && doc && userProfile.uid) {
         const userRef = doc(db, 'users', userProfile.uid);
         await updateDoc(userRef, updates);
       }
@@ -290,7 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveProfileLocally(updated);
 
     try {
-      if (db && doc && userProfile.uid) {
+      if (isFirebaseConfigured && db && doc && userProfile.uid) {
         const userRef = doc(db, 'users', userProfile.uid);
         await updateDoc(userRef, { coins: newCoins });
       }

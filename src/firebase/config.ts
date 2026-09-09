@@ -24,8 +24,16 @@ import {
 import { UserProfile, GameSettings } from '../types';
 
 // Default configuration with environment fallbacks
+const rawApiKey = import.meta.env.VITE_FIREBASE_API_KEY || "";
+export const isFirebaseConfigured = Boolean(
+  rawApiKey && 
+  rawApiKey !== "mock-api-key" && 
+  !rawApiKey.includes("mock") &&
+  rawApiKey.length > 10
+);
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "mock-api-key",
+  apiKey: rawApiKey || "mock-api-key",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "history-card-quest-app.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "history-card-quest-app",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "history-card-quest-app.firebasestorage.app",
