@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QuestionsProvider } from './context/QuestionsContext';
 import { CardsProvider } from './context/CardsContext';
+import { TradingProvider } from './context/TradingContext';
 import { NavigationTab } from './types';
 import { Navbar } from './components/Navbar';
 import { AuthView } from './components/AuthView';
@@ -84,7 +85,9 @@ export default function App() {
     <AuthProvider>
       <QuestionsProvider>
         <CardsProvider>
-          <MainAppContent />
+          <TradingProvider>
+            <MainAppContent />
+          </TradingProvider>
         </CardsProvider>
       </QuestionsProvider>
     </AuthProvider>
