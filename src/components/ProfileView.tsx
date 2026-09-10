@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
+import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { 
   User, 
   Shield, 
@@ -11,7 +12,8 @@ import {
   Lock, 
   LogOut, 
   BookOpen, 
-  BadgeCheck 
+  BadgeCheck,
+  Award
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
@@ -218,6 +220,43 @@ export const ProfileView: React.FC = () => {
           <span>Save Changes</span>
         </button>
       </form>
+
+      {/* Earned Badges & Milestones Showcase */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-bold text-slate-100">
+              Claimed Historical Milestones ({userProfile.claimedAchievements?.length || 0})
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-slate-400">
+            {HISTORICAL_ACHIEVEMENTS.length} Total Badges Available
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {HISTORICAL_ACHIEVEMENTS.map((ach) => {
+            const isClaimed = userProfile.claimedAchievements?.includes(ach.id);
+            return (
+              <div
+                key={ach.id}
+                className={`p-3 rounded-xl border text-center flex flex-col items-center transition-all ${
+                  isClaimed
+                    ? 'bg-amber-500/10 border-amber-500/30 text-slate-100 shadow'
+                    : 'bg-slate-950/40 border-slate-800/60 opacity-40 text-slate-500'
+                }`}
+              >
+                <div className="text-2xl mb-1">{ach.icon}</div>
+                <div className="text-xs font-bold truncate w-full">{ach.title}</div>
+                <div className="text-[10px] font-mono mt-0.5">
+                  {isClaimed ? '✓ Claimed' : 'Locked'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Privacy Guarantee Panel */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">

@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
+import { INITIAL_CLASSROOM_STUDENTS } from '../data/roster';
+import { getAvatarById } from '../data/avatars';
 import { 
   GraduationCap, 
   ShieldCheck, 
@@ -19,11 +21,21 @@ import {
   Filter,
   Package,
   Layers,
-  Sparkles
+  Sparkles,
+  Coins,
+  Award,
+  Search,
+  RotateCcw,
+  UserCheck,
+  Settings
 } from 'lucide-react';
-import { Question } from '../types';
+import { Question, ClassroomStudent, NavigationTab } from '../types';
 
-export const TeacherDashboardView: React.FC = () => {
+interface TeacherDashboardViewProps {
+  onNavigate?: (tab: NavigationTab) => void;
+}
+
+export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({ onNavigate }) => {
   const { userProfile, isTeacher, isAdmin, setStudentViewMode } = useAuth();
   const { 
     questions, 
@@ -39,7 +51,15 @@ export const TeacherDashboardView: React.FC = () => {
     toggleCardActive
   } = useCards();
   
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'units' | 'standards' | 'questions' | 'economy' | 'cards'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'overview' | 'units' | 'standards' | 'questions' | 'economy' | 'cards'>('roster');
+
+  // Classroom Roster state
+  const [students, setStudents] = useState<ClassroomStudent[]>(INITIAL_CLASSROOM_STUDENTS);
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [selectedStudentForBonus, setSelectedStudentForBonus] = useState<ClassroomStudent | null>(null);
+  const [bonusAmount, setBonusAmount] = useState(25);
+  const [bonusReason, setBonusReason] = useState('Excellent class discussion participation');
+  const [awardSuccessNotice, setAwardSuccessNotice] = useState<string | null>(null);
   
   // Card catalog filter state
   const [filterCardUnit, setFilterCardUnit] = useState<string>('all');
@@ -136,23 +156,39 @@ export const TeacherDashboardView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black font-serif text-slate-100">
-                  Ohio 8th Grade {isAdmin ? 'Master Admin' : 'Educator'} Portal
+                  Ohio 8th Grade Social Studies • Teacher Portal
                 </h1>
                 <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {isAdmin ? 'Master Administrator' : 'Teacher Verified'}
+                  {isAdmin ? 'Teacher & Director' : 'Verified Educator'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Manage curriculum units, Ohio 2026 standards, question banks, and classroom coin economy.
+                Classroom student roster, participation coin incentives, and curriculum standards progress.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {isAdmin && onNavigate && (
+              <button
+                id="teacher-to-admin-console-button"
+                type="button"
+                onClick={() => onNavigate('admin')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm"
+                title="Switch to program administration console"
+              >
+                <Settings className="w-4 h-4 text-amber-400" />
+                <span>Admin Console</span>
+              </button>
+            )}
+
             <button
               id="admin-launch-student-view"
               type="button"
-              onClick={() => setStudentViewMode(true)}
+              onClick={() => {
+                setStudentViewMode(true);
+                if (onNavigate) onNavigate('dashboard');
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-950/80 border border-emerald-700 text-emerald-300 hover:bg-emerald-900/90 transition-all cursor-pointer shadow-sm"
               title="Switch directly into student view mode"
             >
@@ -177,6 +213,16 @@ export const TeacherDashboardView: React.FC = () => {
             }`}
           >
             Overview & Stats
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('roster')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'roster' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Classroom Roster ({students.length})</span>
           </button>
           <button
             type="button"
@@ -269,6 +315,265 @@ export const TeacherDashboardView: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">Zero public student PII</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Classroom Roster & Performance Tab */}
+      {activeSubTab === 'roster' && (
+        <div className="space-y-6">
+          {awardSuccessNotice && (
+            <div className="p-3.5 bg-emerald-950/70 border border-emerald-800 rounded-xl text-xs text-emerald-300 flex items-center gap-2 font-medium shadow">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{awardSuccessNotice}</span>
+            </div>
+          )}
+
+          {/* Roster Controls & Stats Header */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-1 max-w-sm">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                placeholder="Search scholar by name or persona..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-slate-400 font-mono">
+                Classroom: <strong className="text-amber-300">{userProfile?.classroomCode || 'JMMS-8TH-2026'}</strong>
+              </span>
+              <span className="text-slate-400 font-mono">
+                Enrolled: <strong className="text-slate-200">{students.length} Scholars</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Roster Table */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Student & Persona</th>
+                    <th className="py-3 px-4 text-center">Coins</th>
+                    <th className="py-3 px-4 text-center">Binder Cards</th>
+                    <th className="py-3 px-4 text-center">Trivia Accuracy</th>
+                    <th className="py-3 px-4 text-center">Trades</th>
+                    <th className="py-3 px-4 text-right">Teacher Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {students
+                    .filter(s => {
+                      if (!rosterSearch.trim()) return true;
+                      const q = rosterSearch.toLowerCase();
+                      return s.displayName.toLowerCase().includes(q) || s.avatar.toLowerCase().includes(q);
+                    })
+                    .map((student) => {
+                      const avatar = getAvatarById(student.avatar);
+                      const accuracyPercent = student.questionsAnswered > 0
+                        ? Math.round((student.correctAnswers / student.questionsAnswered) * 100)
+                        : 0;
+
+                      return (
+                        <tr key={student.uid} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg ${avatar.color} flex items-center justify-center text-base shrink-0 shadow`}>
+                                {avatar.badge}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-100 flex items-center gap-2">
+                                  <span>{student.displayName}</span>
+                                  <span className="text-[10px] font-mono text-slate-500 font-normal">
+                                    #{student.uid.substring(0, 8)}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {avatar.name} • Active {student.lastActive}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="inline-flex items-center gap-1 font-mono font-bold text-amber-300">
+                              <Coins className="w-3.5 h-3.5" />
+                              {student.coins}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="font-mono font-bold text-slate-200">
+                              {student.uniqueCards} <span className="text-slate-500 font-normal">unique</span>
+                            </span>
+                            <div className="text-[10px] text-slate-500 font-mono">
+                              {student.totalCards} total
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="font-mono font-bold text-indigo-300">
+                              {student.correctAnswers} / {student.questionsAnswered}
+                            </span>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {accuracyPercent}% correct
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="font-mono font-bold text-emerald-300">
+                              {student.tradesCompleted}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudentForBonus(student)}
+                                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                title="Award classroom participation coins"
+                              >
+                                <Sparkles className="w-3 h-3" />
+                                <span>+Coins</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStudents(prev => prev.map(s => {
+                                    if (s.uid === student.uid) {
+                                      return { ...s, questionsAnswered: 0 };
+                                    }
+                                    return s;
+                                  }));
+                                  setAwardSuccessNotice(`Reset daily trivia quota for ${student.displayName}!`);
+                                  setTimeout(() => setAwardSuccessNotice(null), 3000);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-all"
+                                title="Reset daily trivia question quota for this student"
+                              >
+                                <RotateCcw className="w-3 h-3 text-slate-400" />
+                                <span>Reset Quota</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Modal: Award Bonus Coins */}
+          {selectedStudentForBonus && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-400" />
+                    <h3 className="font-bold text-slate-100 text-sm">
+                      Award Participation Coins
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentForBonus(null)}
+                    className="text-slate-400 hover:text-slate-200 text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                  <div className="text-slate-400">Awarding To:</div>
+                  <div className="font-bold text-slate-100 text-sm">{selectedStudentForBonus.displayName}</div>
+                  <div className="text-[11px] text-amber-300 font-mono">Current Balance: {selectedStudentForBonus.coins} coins</div>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setStudents(prev => prev.map(s => {
+                      if (s.uid === selectedStudentForBonus.uid) {
+                        return { ...s, coins: s.coins + Number(bonusAmount) };
+                      }
+                      return s;
+                    }));
+                    setAwardSuccessNotice(`Awarded +${bonusAmount} coins to ${selectedStudentForBonus.displayName}!`);
+                    setTimeout(() => setAwardSuccessNotice(null), 3000);
+                    setSelectedStudentForBonus(null);
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Coin Grant Amount
+                    </label>
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      {[15, 25, 50, 100].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setBonusAmount(amt)}
+                          className={`py-1.5 rounded-lg text-xs font-bold font-mono transition-all ${
+                            bonusAmount === amt
+                              ? 'bg-amber-500 text-slate-950'
+                              : 'bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700'
+                          }`}
+                        >
+                          +{amt}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      min={5}
+                      max={500}
+                      value={bonusAmount}
+                      onChange={(e) => setBonusAmount(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-slate-100 font-mono focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Reason / Educational Merit
+                    </label>
+                    <input
+                      type="text"
+                      value={bonusReason}
+                      onChange={(e) => setBonusReason(e.target.value)}
+                      placeholder="e.g. Constitutional debate, homework completion..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudentForBonus(null)}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow"
+                    >
+                      Confirm Grant
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

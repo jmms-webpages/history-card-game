@@ -21,7 +21,8 @@ import {
   ShieldAlert,
   Calendar,
   Layers,
-  Award
+  Award,
+  Trophy
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -38,8 +39,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   if (!userProfile) return null;
 
   const currentAvatar = getAvatarById(userProfile.avatar);
-  const dailyAnswered = dailyActivity.questionsAnswered;
-  const dailyLimit = gameSettings.dailyQuestionLimit;
+  const dailyAnswered = dailyActivity?.questionsAnswered ?? 0;
+  const dailyLimit = gameSettings?.dailyQuestionLimit ?? 10;
 
   // Recent cards pulled (latest 5 inventory items)
   const recentPulls = [...inventoryCards].reverse().slice(0, 5);
@@ -52,30 +53,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className={`w-16 h-16 rounded-2xl ${currentAvatar.color} flex items-center justify-center text-3xl shadow-lg border border-amber-400/30`}>
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <div className={`w-16 h-16 rounded-2xl ${currentAvatar.color} flex items-center justify-center text-3xl shadow-lg border border-amber-400/30 shrink-0`}>
               {currentAvatar.badge}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">
-                  {userProfile.classroomCode} • {userProfile.role === 'teacher' ? 'Educator' : '8th Grade Historian'}
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono truncate">
+                  {userProfile.classroomCode} • {userProfile.role === 'teacher' ? 'Educator' : (userProfile.role === 'admin' ? 'Teacher & Director' : '8th Grade Historian')}
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">
+              <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100 truncate break-words">
                 Welcome back, {userProfile.displayName}!
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 truncate">
                 Avatar: <span className="text-amber-300 font-medium">{currentAvatar.name}</span> — {currentAvatar.title}
               </p>
             </div>
           </div>
 
           {/* Quick Metrics (Coins & Daily Limit) */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
             {/* Coins Balance */}
             <div className="bg-slate-950/80 border border-slate-700 rounded-2xl p-4 flex items-center gap-3 w-full sm:w-auto">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
                 <Coins className="w-5 h-5" />
               </div>
               <div>
@@ -112,7 +113,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Collection Binder Progress Summary Card (Phase 3 Live) */}
+      {/* Collection Binder Progress Summary Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -125,7 +126,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                   History Collection Binder
                 </h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Phase 3 Live
+                  Official Set
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -170,7 +171,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* Quick Action Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
         {/* Action: Questions */}
         <div 
@@ -253,6 +254,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Exchange duplicate cards safely with classmates using secure atomic transactions.
+          </p>
+        </div>
+
+        {/* Action: Leaderboard & Milestones */}
+        <div 
+          onClick={() => onNavigate('leaderboard')}
+          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+            <Trophy className="w-5 h-5" />
+          </div>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
+              Honor Roll
+            </h3>
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Rankings
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Classroom leaderboard, scholar standings, and historical achievement milestone rewards.
           </p>
         </div>
 

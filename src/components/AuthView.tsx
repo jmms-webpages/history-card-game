@@ -9,7 +9,7 @@ export const AuthView: React.FC = () => {
   const [studentName, setStudentName] = useState('');
 
   const handleAdminGoogleSignIn = () => {
-    loginWithGoogle('jaf2jc@bearworks.jackson.sparcc.org', 'Master Administrator');
+    loginWithGoogle('jaf2jc@bearworks.jackson.sparcc.org', 'Teacher & Director');
   };
 
   const handleStudentGoogleSignIn = (e: React.FormEvent) => {
@@ -104,12 +104,12 @@ export const AuthView: React.FC = () => {
             </span>
           </button>
 
-          {/* Admin Auto-Detection Badge */}
+          {/* Teacher & Director Auto-Detection Badge */}
           <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-[11px] text-slate-300 leading-snug">
-              <span className="font-semibold text-amber-300">Master Administrator: </span>
-              Signing in directly authenticates <span className="font-mono text-amber-200">jaf2jc@bearworks.jackson.sparcc.org</span> with Master Administrator privileges and the Student View toggle.
+              <span className="font-semibold text-amber-300">Teacher & Program Director: </span>
+              Signing in connects <span className="font-mono text-amber-200">jaf2jc@bearworks.jackson.sparcc.org</span> with access to the Teacher Dashboard, Admin Console, and Student View mode.
             </div>
           </div>
 

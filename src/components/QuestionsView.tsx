@@ -78,13 +78,18 @@ export const QuestionsView: React.FC = () => {
     submitAnswer(index);
   };
 
+  const questionsAnswered = dailyActivity?.questionsAnswered ?? 0;
+  const correctAnswers = dailyActivity?.correctAnswers ?? 0;
+  const coinsEarned = dailyActivity?.coinsEarned ?? 0;
+  const questionLimit = gameSettings?.dailyQuestionLimit ?? 10;
+
   const progressPercent = Math.min(
     100, 
-    Math.round((dailyActivity.questionsAnswered / gameSettings.dailyQuestionLimit) * 100)
+    Math.round((questionsAnswered / questionLimit) * 100)
   );
 
-  const accuracyPercent = dailyActivity.questionsAnswered > 0
-    ? Math.round((dailyActivity.correctAnswers / dailyActivity.questionsAnswered) * 100)
+  const accuracyPercent = questionsAnswered > 0
+    ? Math.round((correctAnswers / questionsAnswered) * 100)
     : 0;
 
   return (
@@ -140,11 +145,11 @@ export const QuestionsView: React.FC = () => {
             <span className="text-slate-300 flex items-center gap-1.5">
               <span>Today's Questions:</span>
               <span className="font-bold text-amber-400 font-mono">
-                {dailyActivity.questionsAnswered} / {gameSettings.dailyQuestionLimit}
+                {questionsAnswered} / {questionLimit}
               </span>
             </span>
             <span className="text-slate-400 font-mono">
-              Coins earned today: <strong className="text-amber-300">+{dailyActivity.coinsEarned}</strong>
+              Coins earned today: <strong className="text-amber-300">+{coinsEarned}</strong>
             </span>
           </div>
 
@@ -385,7 +390,7 @@ export const QuestionsView: React.FC = () => {
             {accuracyPercent}%
           </p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {dailyActivity.correctAnswers} of {dailyActivity.questionsAnswered} correct today
+            {correctAnswers} of {questionsAnswered} correct today
           </p>
         </div>
 
@@ -395,7 +400,7 @@ export const QuestionsView: React.FC = () => {
             <Coins className="w-4 h-4 text-amber-400" />
           </div>
           <p className="text-2xl font-black text-amber-400 font-mono mt-1">
-            +{gameSettings.correctCoinReward} / +{gameSettings.incorrectCoinReward}
+            +{gameSettings?.correctCoinReward ?? 10} / +{gameSettings?.incorrectCoinReward ?? 3}
           </p>
           <p className="text-[11px] text-slate-500 mt-0.5">
             +10 for correct, +3 effort (never lost)
@@ -408,10 +413,10 @@ export const QuestionsView: React.FC = () => {
             <Trophy className="w-4 h-4 text-indigo-400" />
           </div>
           <p className="text-2xl font-black text-slate-100 font-mono mt-1">
-            {Math.max(0, gameSettings.dailyQuestionLimit - dailyActivity.questionsAnswered)} Left
+            {Math.max(0, questionLimit - questionsAnswered)} Left
           </p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {gameSettings.dailyQuestionLimit} questions max rewarded daily
+            {questionLimit} questions max rewarded daily
           </p>
         </div>
       </div>

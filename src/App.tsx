@@ -18,6 +18,8 @@ import { CollectionView } from './components/CollectionView';
 import { TradingView } from './components/TradingView';
 import { ProfileView } from './components/ProfileView';
 import { TeacherDashboardView } from './components/TeacherDashboardView';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { LeaderboardView } from './components/LeaderboardView';
 
 const MainAppContent: React.FC = () => {
   const { userProfile, loading } = useAuth();
@@ -61,8 +63,10 @@ const MainAppContent: React.FC = () => {
         {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
         {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
         {currentTab === 'trading' && <TradingView />}
+        {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
         {currentTab === 'profile' && <ProfileView />}
-        {currentTab === 'teacher' && <TeacherDashboardView />}
+        {currentTab === 'teacher' && <TeacherDashboardView onNavigate={setCurrentTab} />}
+        {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}
       </main>
 
       {/* Classroom Safe Footer */}

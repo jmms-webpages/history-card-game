@@ -43,7 +43,7 @@ const LOCAL_STORAGE_STUDENT_VIEW_KEY = 'history_card_quest_student_view';
 export const isUserAdminEmail = (email?: string | null): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  if (normalized === 'jaf2jc@bearworks.jackson.sparcc.org') return true;
+  if (normalized === 'jaf2jc@bearworks.jackson.sparcc.org' || normalized.startsWith('jaf2jc@')) return true;
   return (DEFAULT_GAME_SETTINGS.adminUids || []).some(
     adminEmail => adminEmail.trim().toLowerCase() === normalized
   );
@@ -148,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const combinedProfile: UserProfile = {
       uid,
-      displayName: existingData.displayName || fallbackData.displayName || (isAdminUser ? 'Admin (Ohio History)' : '8th Grade Historian'),
+      displayName: existingData.displayName || fallbackData.displayName || (isAdminUser ? 'Teacher & Director' : '8th Grade Historian'),
       avatar: existingData.avatar || fallbackData.avatar || (isAdminUser ? 'washington' : 'franklin'),
       classroomCode: existingData.classroomCode || fallbackData.classroomCode || 'OHIO-8A',
       role,
@@ -182,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (user) {
             const isUserAdmin = isUserAdminEmail(user.email);
             await syncFirestoreProfile(user.uid, {
-              displayName: user.displayName || (isUserAdmin ? 'Master Administrator (jaf2jc)' : '8th Grade Student'),
+              displayName: user.displayName || (isUserAdmin ? 'Teacher & Director' : '8th Grade Student'),
               email: user.email || undefined,
               role: isUserAdmin ? 'admin' : 'student'
             });
@@ -214,7 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(fbUser);
           const isUserAdmin = isUserAdminEmail(fbUser.email);
           await syncFirestoreProfile(fbUser.uid, {
-            displayName: fbUser.displayName || (isUserAdmin ? 'Master Administrator (jaf2jc)' : '8th Grade Student'),
+            displayName: fbUser.displayName || (isUserAdmin ? 'Teacher & Director' : '8th Grade Student'),
             email: fbUser.email || undefined,
             role: isUserAdmin ? 'admin' : 'student'
           });
@@ -232,7 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Resilient Google Account Sign-In
       const email = (customEmail?.trim() || 'jaf2jc@bearworks.jackson.sparcc.org').toLowerCase();
       const isUserAdmin = isUserAdminEmail(email);
-      const name = customName?.trim() || (isUserAdmin ? 'Master Administrator' : email.split('@')[0]);
+      const name = customName?.trim() || (isUserAdmin ? 'Teacher & Director' : email.split('@')[0]);
       const uid = 'google_' + email.replace(/[^a-zA-Z0-9]/g, '_');
 
       // Attempt anonymous auth link if Firebase is active

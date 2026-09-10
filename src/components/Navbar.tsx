@@ -15,7 +15,9 @@ import {
   Menu, 
   X,
   ShieldCheck,
-  Eye
+  Eye,
+  Trophy,
+  Settings
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -41,29 +43,31 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
 
   // Define regular tabs available to all players
   const navItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: <Compass className="w-4 h-4" /> },
-    { id: 'questions', label: 'Questions', icon: <HelpCircle className="w-4 h-4" />, badge: 'Phase 2' },
-    { id: 'packs', label: 'Packs', icon: <Package className="w-4 h-4" />, badge: 'Phase 3' },
-    { id: 'collection', label: 'Collection', icon: <Library className="w-4 h-4" />, badge: 'Phase 3' },
-    { id: 'trading', label: 'Trading', icon: <Repeat className="w-4 h-4" />, badge: 'Phase 4' },
-    { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> }
+    { id: 'dashboard', label: 'Dashboard', icon: <Compass className="w-3.5 h-3.5" /> },
+    { id: 'questions', label: 'Trivia', icon: <HelpCircle className="w-3.5 h-3.5" /> },
+    { id: 'packs', label: 'Packs', icon: <Package className="w-3.5 h-3.5" /> },
+    { id: 'collection', label: 'Binder', icon: <Library className="w-3.5 h-3.5" /> },
+    { id: 'trading', label: 'Trading', icon: <Repeat className="w-3.5 h-3.5" /> },
+    { id: 'leaderboard', label: 'Honor Roll', icon: <Trophy className="w-3.5 h-3.5" /> }
   ];
 
-  // Admin / Teacher Portal Tab
+  // Teacher Portal Tab (Available to both teachers and admins)
   if (isTeacher || isAdmin) {
     navItems.push({
       id: 'teacher',
-      label: isAdmin ? 'Admin Portal' : 'Teacher Portal',
-      icon: <GraduationCap className="w-4 h-4 text-amber-300" />,
-      badge: isAdmin ? 'Admin' : 'Teacher'
+      label: 'Teacher Portal',
+      icon: <GraduationCap className="w-3.5 h-3.5 text-amber-300" />,
+      badge: 'Roster'
     });
+  }
 
-    // Dedicated "Student View" Tab for Admin
+  // Admin Console Tab (Dedicated to program runner/admin)
+  if (isAdmin) {
     navItems.push({
-      id: 'student-view',
-      label: 'Student View',
-      icon: <Eye className={`w-4 h-4 ${isStudentViewMode ? 'text-emerald-400' : 'text-slate-400'}`} />,
-      badge: isStudentViewMode ? 'Active' : 'Preview'
+      id: 'admin',
+      label: 'Admin Console',
+      icon: <Settings className="w-3.5 h-3.5 text-amber-400" />,
+      badge: 'Program'
     });
   }
 
@@ -72,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
       setStudentViewMode(true);
       onSelectTab('dashboard');
     } else {
-      if (tab === 'teacher') {
+      if (tab === 'teacher' || tab === 'admin') {
         setStudentViewMode(false);
       }
       onSelectTab(tab);
@@ -83,78 +87,91 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 shadow-md">
       
-      {/* Student View Notification Banner when Admin is previewing as student */}
+      {/* Student View Notification Banner when Educator/Admin is previewing */}
       {isStudentViewMode && (isAdmin || isTeacher) && (
-        <div className="bg-emerald-950/90 border-b border-emerald-700/60 px-4 py-2 text-xs flex items-center justify-between text-emerald-200">
+        <div className="bg-emerald-950/90 border-b border-emerald-700/60 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 text-emerald-200">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
-              <strong className="text-emerald-100">Student View Mode Active:</strong> You are experiencing History Card Quest exactly as an 8th-grade student sees it.
+              <strong className="text-emerald-100">Student View Active:</strong> You are experiencing the app exactly as an 8th-grade student sees it.
             </span>
           </div>
-          <button
-            id="exit-student-view-banner-button"
-            onClick={() => {
-              setStudentViewMode(false);
-              onSelectTab('teacher');
-            }}
-            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer shrink-0 ml-3"
-          >
-            Return to Admin Portal
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              id="exit-student-view-to-teacher-button"
+              onClick={() => {
+                setStudentViewMode(false);
+                onSelectTab('teacher');
+              }}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+            >
+              Teacher Dashboard
+            </button>
+            {isAdmin && (
+              <button
+                id="exit-student-view-to-admin-button"
+                onClick={() => {
+                  setStudentViewMode(false);
+                  onSelectTab('admin');
+                }}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+              >
+                Admin Console
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-2">
           
           {/* Logo & Grade 8 Badge */}
           <div 
-            className="flex items-center gap-3 cursor-pointer" 
+            className="flex items-center gap-2.5 cursor-pointer shrink-0" 
             onClick={() => handleTabClick('dashboard')}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-xl font-black text-slate-950 shadow-inner">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-lg font-black text-slate-950 shadow-inner shrink-0">
               ⚔️
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-tight text-amber-400 font-serif">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-base tracking-tight text-amber-400 font-serif whitespace-nowrap">
                   History Card Quest
                 </span>
-                <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
-                  Ohio 8th Grade
+                <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 rounded border border-amber-500/30 whitespace-nowrap">
+                  Ohio 8th
                 </span>
               </div>
-              <p className="text-xs text-slate-400 hidden md:block">
-                Social Studies Standards Quest
-              </p>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden xl:flex items-center gap-1 shrink-0">
             {navItems.map((item) => {
-              const isActive = (currentTab === item.id) || (item.id === 'student-view' && isStudentViewMode && currentTab === 'dashboard');
+              const isActive = (currentTab === item.id) && !(isStudentViewMode && (item.id === 'teacher' || item.id === 'admin'));
               return (
                 <button
                   key={item.id}
                   id={`nav-tab-${item.id}`}
                   onClick={() => handleTabClick(item.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? item.id === 'student-view'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold'
-                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      ? item.id === 'admin'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                        : item.id === 'teacher'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm font-bold'
+                        : 'bg-slate-800 text-amber-400 border border-slate-700 shadow-sm font-semibold'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
                   {item.icon}
                   <span>{item.label}</span>
                   {item.badge && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded border font-mono ${
-                      item.id === 'student-view' && isStudentViewMode
-                        ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${
+                      isActive && item.id === 'admin' 
+                        ? 'bg-slate-950 text-amber-300'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
                     }`}>
                       {item.badge}
                     </span>
@@ -164,33 +181,33 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
             })}
           </nav>
 
-          {/* Right side: Coins, Quick Toggle, User Avatar Pill, Logout */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Right side: Coins, Student View Toggle, User Avatar Pill, Logout, Mobile Menu */}
+          <div className="flex items-center gap-2 shrink-0">
             
-            {/* Quick Student View Toggle for Admin */}
+            {/* Quick Student View Toggle for Admin/Teacher */}
             {(isAdmin || isTeacher) && (
               <button
                 id="quick-student-view-toggle"
                 onClick={toggleStudentViewMode}
-                className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                className={`hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
                   isStudentViewMode
-                    ? 'bg-emerald-950/70 border-emerald-700 text-emerald-300 hover:bg-emerald-900/80'
+                    ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300 hover:bg-emerald-900'
                     : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-white'
                 }`}
                 title={isStudentViewMode ? "Currently previewing as student. Click to exit." : "Preview game as an 8th grade student"}
               >
                 <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{isStudentViewMode ? 'Student View: ON' : 'Student View'}</span>
+                <span className="hidden 2xl:inline">{isStudentViewMode ? 'Student View: ON' : 'Student View'}</span>
               </button>
             )}
 
             {/* Coins Counter */}
             <div 
               id="user-coin-badge"
-              className="flex items-center gap-1.5 bg-slate-800/90 border border-amber-500/30 px-3 py-1.5 rounded-full text-amber-300 font-mono font-bold text-sm shadow-sm"
+              className="flex items-center gap-1.5 bg-slate-800/90 border border-amber-500/30 px-2.5 py-1 rounded-full text-amber-300 font-mono font-bold text-xs shadow-sm shrink-0"
               title="Classroom Coins - Earn by answering daily history questions"
             >
-              <Coins className="w-4 h-4 text-amber-400" />
+              <Coins className="w-3.5 h-3.5 text-amber-400" />
               <span>{userProfile.coins ?? 0}</span>
             </div>
 
@@ -198,17 +215,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
             <button
               id="profile-avatar-button"
               onClick={() => handleTabClick('profile')}
-              className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-2 py-1 rounded-full transition-colors cursor-pointer shrink-0"
             >
-              <div className={`w-7 h-7 rounded-full ${currentAvatar.color} flex items-center justify-center text-xs font-bold text-white shadow`}>
+              <div className={`w-6 h-6 rounded-full ${currentAvatar.color} flex items-center justify-center text-[10px] font-bold text-white shadow shrink-0`}>
                 {currentAvatar.badge}
               </div>
-              <span className="text-sm font-medium text-slate-200 hidden sm:inline max-w-[120px] truncate">
+              <span className="text-xs font-medium text-slate-200 hidden sm:inline max-w-[100px] truncate">
                 {userProfile.displayName}
               </span>
               {isAdmin && (
-                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  <ShieldCheck className="w-3 h-3 text-amber-400" />
+                <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   Admin
                 </span>
               )}
@@ -219,16 +235,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
               id="nav-logout-button"
               onClick={logout}
               title="Sign Out"
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
             >
               <LogOut className="w-4 h-4" />
             </button>
 
-            {/* Mobile menu hamburger */}
+            {/* Mobile menu hamburger (shown on < xl screens) */}
             <button
               id="nav-mobile-toggle"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
+              className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg shrink-0"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -238,17 +254,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-800 bg-slate-900 px-4 py-3 space-y-1">
+        <div className="xl:hidden border-t border-slate-800 bg-slate-900 px-4 py-3 space-y-1">
           {navItems.map((item) => {
-            const isActive = (currentTab === item.id) || (item.id === 'student-view' && isStudentViewMode && currentTab === 'dashboard');
+            const isActive = (currentTab === item.id) && !(isStudentViewMode && (item.id === 'teacher' || item.id === 'admin'));
             return (
               <button
                 key={item.id}
                 onClick={() => handleTabClick(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer ${
                   isActive
-                    ? item.id === 'student-view'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                    ? item.id === 'admin'
+                      ? 'bg-amber-500 text-slate-950 font-bold shadow'
                       : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                     : 'text-slate-300 hover:bg-slate-800'
                 }`}
@@ -258,19 +274,43 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                    item.id === 'student-view' && isStudentViewMode
-                      ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-800 text-slate-400 border-slate-700">
                     {item.badge}
                   </span>
                 )}
               </button>
             );
           })}
+
+          {/* Mobile Student View toggle for teachers & admins */}
+          {(isAdmin || isTeacher) && (
+            <button
+              onClick={() => {
+                toggleStudentViewMode();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium bg-emerald-950/40 border border-emerald-800 text-emerald-300 hover:bg-emerald-900/40 cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Student View Mode</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-200">
+                {isStudentViewMode ? 'Active' : 'Off'}
+              </span>
+            </button>
+          )}
+
+          <button
+            onClick={() => handleTabClick('profile')}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 cursor-pointer"
+          >
+            <User className="w-3.5 h-3.5 text-slate-400" />
+            <span>Profile & Scholar Settings</span>
+          </button>
         </div>
       )}
     </header>
   );
 };
+
