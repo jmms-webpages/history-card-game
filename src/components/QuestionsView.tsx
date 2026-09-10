@@ -97,7 +97,7 @@ export const QuestionsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-semibold uppercase tracking-wider">
                 <Sparkles className="w-3 h-3" />
-                Phase 2: Daily Trivia Quest
+                Daily Trivia Quest
               </span>
               {practiceMode && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[11px] font-medium">

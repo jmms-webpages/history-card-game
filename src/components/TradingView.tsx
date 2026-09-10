@@ -160,7 +160,7 @@ export const TradingView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 font-mono bg-indigo-500/10 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
-                Phase 4 Live: Classroom Trading
+                Classroom Trading System
               </span>
               <span className="text-xs font-mono text-slate-400">
                 Code: {userProfile.classroomCode}

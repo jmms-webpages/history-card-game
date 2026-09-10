@@ -205,8 +205,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
               Card Pack Depot
             </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Phase 3
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Active
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -227,7 +227,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               My Binder
             </h3>
             <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Phase 3
+              Active
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
