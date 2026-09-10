@@ -33,12 +33,14 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'classroomCode'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
+  lastUsedEmail: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_USER_KEY = 'history_card_quest_user';
 const LOCAL_STORAGE_STUDENT_VIEW_KEY = 'history_card_quest_student_view';
+const LOCAL_STORAGE_LAST_EMAIL_KEY = 'history_card_quest_last_email';
 
 // Strict authorized school district email domains
 export const ALLOWED_EMAIL_DOMAINS = [
@@ -58,7 +60,8 @@ export const isUserAdminEmail = (email?: string | null): boolean => {
   if (
     normalized === 'jaf2jc@bearworks.jackson.sparcc.org' ||
     normalized === 'jaf2jc@jackson.sparcc.org' ||
-    normalized.startsWith('jaf2jc@')
+    normalized.startsWith('jaf2jc@') ||
+    normalized === 'jaf2jc'
   ) {
     return true;
   }
@@ -69,6 +72,14 @@ export const isUserAdminEmail = (email?: string | null): boolean => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [lastUsedEmail, setLastUsedEmail] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_LAST_EMAIL_KEY);
+    } catch {
+      return null;
+    }
+  });
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
@@ -117,6 +128,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(profile);
     if (profile) {
       localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+      if (profile.email) {
+        localStorage.setItem(LOCAL_STORAGE_LAST_EMAIL_KEY, profile.email);
+        setLastUsedEmail(profile.email);
+      }
     } else {
       localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
     }
@@ -277,8 +292,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Resilient Google Account Sign-In (Defaults automatically to student)
-      const email = customEmail?.trim().toLowerCase() || 'student@bearworks.jackson.sparcc.org';
+      // Resilient Google Account Sign-In
+      let email = customEmail?.trim().toLowerCase();
+      if (!email) {
+        if (lastUsedEmail && isAllowedEmailDomain(lastUsedEmail)) {
+          email = lastUsedEmail.trim().toLowerCase();
+        } else {
+          // If no email was specified, default safely to the educator admin account
+          email = 'jaf2jc@bearworks.jackson.sparcc.org';
+        }
+      }
+
+      // If user provided a short username (like "jaf2jc"), auto-complete with @bearworks.jackson.sparcc.org
+      if (!email.includes('@')) {
+        email = `${email}@bearworks.jackson.sparcc.org`;
+      }
 
       // Strictly enforce district domain authorization
       if (!isAllowedEmailDomain(email)) {
@@ -382,7 +410,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       updateUserProfile,
       updateCoins,
-      clearError: () => setError(null)
+      clearError: () => setError(null),
+      lastUsedEmail
     }}>
       {children}
     </AuthContext.Provider>
