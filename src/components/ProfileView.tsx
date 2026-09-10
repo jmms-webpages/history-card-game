@@ -30,15 +30,16 @@ export const ProfileView: React.FC = () => {
   
   if (!userProfile) return null;
 
-  const [displayName, setDisplayName] = useState(userProfile.displayName);
   const [classroomCode, setClassroomCode] = useState(userProfile.classroomCode);
   const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile.avatar);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Note: displayName is intentionally NOT editable here. It is derived
+    // automatically from the student's real Google account name and is
+    // locked server-side (see firestore.rules) so it can never be spoofed.
     await updateUserProfile({
-      displayName: displayName.trim(),
       classroomCode: classroomCode.trim().toUpperCase(),
       avatar: selectedAvatarId
     });
@@ -137,17 +138,14 @@ export const ProfileView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Display Name (Shown in classroom & trades)
+              Display Name
             </label>
-            <input
-              type="text"
-              required
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
-            />
+            <div className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-400 text-sm flex items-center gap-2 cursor-not-allowed">
+              <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>{userProfile.displayName}</span>
+            </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Keep it classroom-friendly (e.g. First Name + Last Initial).
+              Your display name is set automatically from your school Google account and can't be changed here.
             </p>
           </div>
 
@@ -281,6 +279,10 @@ export const ProfileView: React.FC = () => {
               <li className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>Only your display name, chosen historical avatar, and unique safe identifier are visible to trading peers.</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Your display name is generated automatically from your school account and can't be changed to something else.</span>
               </li>
             </ul>
           </div>
