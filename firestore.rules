@@ -2,13 +2,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // ---- Helper functions -----------------------------------------------
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Must stay in sync with ALLOWED_EMAIL_DOMAINS in AuthContext.tsx.
+    function isAllowedEmailDomain(email) {
+      return email != null && (
+        email.matches('.*@bearworks[.]jackson[.]sparcc[.]org$') ||
+        email.matches('.*@jackson[.]sparcc[.]org$')
+      );
+    }
+
+    // Must stay in sync with ADMIN_EMAILS in AuthContext.tsx. Exact-match
+    // ONLY -- never prefix/substring matching -- so this can't be spoofed
+    // by an email like "jaf2jc@example.com".
+    function isDesignatedAdminEmail(email) {
+      return email != null && (
+        email == 'jaf2jc@bearworks.jackson.sparcc.org' ||
+        email == 'jaf2jc@jackson.sparcc.org'
+      );
     }
 
     function isAdmin() {
@@ -27,17 +46,34 @@ service cloud.firestore {
 
     // User profiles
     match /users/{userId} {
-      // Authenticated users can read public safe fields of other students (for trading), or owner reads all
-      allow read: if isAuthenticated();
-      // Users can create their own profile on signup
-      allow create: if isOwner(userId) && 
-        request.resource.data.role in ['student', 'teacher'] &&
-        request.resource.data.coins >= 0;
-      // Users can update safe profile fields like displayName, avatar, classroomCode, lastLoginAt
-      // Role and coins changes are restricted
+      // Only the profile owner or an admin/teacher may read a profile.
+      // Classmates never see each other's Firestore user documents
+      // (which contain email) -- trading UI only ever shows safe,
+      // separately-curated peer data.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // A user may only ever create THEIR OWN profile document, using the
+      // email on their verified Firebase Auth token (not client-supplied
+      // data), restricted to district Google accounts. Only the exact
+      // designated admin email(s) may create themselves with role
+      // 'admin' -- every other account is forced to start as 'student'.
+      allow create: if isOwner(userId) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        isAllowedEmailDomain(request.resource.data.email) &&
+        request.resource.data.coins >= 0 &&
+        (
+          (isDesignatedAdminEmail(request.auth.token.email) && request.resource.data.role == 'admin') ||
+          (!isDesignatedAdminEmail(request.auth.token.email) && request.resource.data.role == 'student')
+        );
+
+      // Users can update safe profile fields (avatar, classroomCode,
+      // lastLoginAt, coins). role, displayName, and email can NEVER be
+      // changed by the user themself -- only an admin can change them
+      // (e.g. to promote a 'teacher').
       allow update: if isAdmin() || (
         isOwner(userId) &&
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'displayName', 'email'])
       );
       allow delete: if isAdmin();
 
