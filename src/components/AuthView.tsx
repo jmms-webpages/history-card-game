@@ -8,14 +8,18 @@ export const AuthView: React.FC = () => {
   const [studentEmail, setStudentEmail] = useState('');
   const [studentName, setStudentName] = useState('');
 
-  const handleAdminGoogleSignIn = () => {
+  const handleDefaultGoogleSignIn = () => {
+    loginWithGoogle();
+  };
+
+  const handleTeacherDirectorSignIn = () => {
     loginWithGoogle('jaf2jc@bearworks.jackson.sparcc.org', 'Teacher & Director');
   };
 
   const handleStudentGoogleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     const email = studentEmail.trim() || 'student@bearworks.jackson.sparcc.org';
-    const name = studentName.trim() || email.split('@')[0];
+    const name = studentName.trim() || '8th Grade Student';
     loginWithGoogle(email, name);
   };
 
@@ -73,11 +77,11 @@ export const AuthView: React.FC = () => {
             </p>
           </div>
 
-          {/* Primary Google Sign In Button */}
+          {/* Primary Google Sign In Button - Defaults automatically to Student */}
           <button
             id="google-signin-button"
             type="button"
-            onClick={handleAdminGoogleSignIn}
+            onClick={handleDefaultGoogleSignIn}
             disabled={loading}
             className="w-full py-3.5 px-5 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-900 font-bold rounded-xl text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 border border-slate-200"
           >
@@ -104,13 +108,36 @@ export const AuthView: React.FC = () => {
             </span>
           </button>
 
-          {/* Teacher & Director Auto-Detection Badge */}
-          <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          {/* Student Default Notice */}
+          <div className="mt-4 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-start gap-2.5">
+            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-[11px] text-slate-300 leading-snug">
-              <span className="font-semibold text-amber-300">Teacher & Program Director: </span>
-              Signing in connects <span className="font-mono text-amber-200">jaf2jc@bearworks.jackson.sparcc.org</span> with access to the Teacher Dashboard, Admin Console, and Student View mode.
+              <span className="font-semibold text-emerald-300">Automatic Student Onboarding: </span>
+              All first-time sign-ins are automatically registered as <strong className="text-white">8th Grade Students</strong> with 50 starter coins, full daily trivia access, and private classroom progress.
             </div>
+          </div>
+
+          {/* Educator / Director Dedicated Sign-In */}
+          <div className="mt-4 p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Classroom Educator & Director Portal</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Are you the classroom teacher or administrator? Sign in to unlock the Teacher Dashboard & Admin Console.
+            </p>
+            <button
+              id="teacher-signin-button"
+              type="button"
+              onClick={handleTeacherDirectorSignIn}
+              disabled={loading}
+              className="w-full py-2 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 font-medium text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Sign in as Teacher / Director (jaf2jc@bearworks...)</span>
+              <ArrowRight className="w-3.5 h-3.5 text-amber-300" />
+            </button>
           </div>
 
           {/* Optional Student Google Account Section */}

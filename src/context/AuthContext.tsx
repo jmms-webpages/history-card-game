@@ -137,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const emailToCheck = fallbackData.email || existingData.email || '';
     const isAdminUser = isUserAdminEmail(emailToCheck);
     
+    // Default role is strictly 'student' unless specifically authenticated as an admin email
     let role: UserRole = 'student';
     if (isAdminUser) {
       role = 'admin';
@@ -144,11 +145,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role = existingData.role;
     } else if (fallbackData.role) {
       role = fallbackData.role;
+    } else {
+      role = 'student';
     }
 
     const combinedProfile: UserProfile = {
       uid,
-      displayName: existingData.displayName || fallbackData.displayName || (isAdminUser ? 'Teacher & Director' : '8th Grade Historian'),
+      displayName: existingData.displayName || fallbackData.displayName || (isAdminUser ? 'Teacher & Director' : '8th Grade Student'),
       avatar: existingData.avatar || fallbackData.avatar || (isAdminUser ? 'washington' : 'franklin'),
       classroomCode: existingData.classroomCode || fallbackData.classroomCode || 'OHIO-8A',
       role,
@@ -229,10 +232,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Resilient Google Account Sign-In
-      const email = (customEmail?.trim() || 'jaf2jc@bearworks.jackson.sparcc.org').toLowerCase();
+      // Resilient Google Account Sign-In (Defaults automatically to student)
+      const email = customEmail?.trim().toLowerCase() || 'student@bearworks.jackson.sparcc.org';
       const isUserAdmin = isUserAdminEmail(email);
-      const name = customName?.trim() || (isUserAdmin ? 'Teacher & Director' : email.split('@')[0]);
+      const name = customName?.trim() || (isUserAdmin ? 'Teacher & Director' : (email.startsWith('student') ? '8th Grade Student' : email.split('@')[0]));
       const uid = 'google_' + email.replace(/[^a-zA-Z0-9]/g, '_');
 
       // Attempt anonymous auth link if Firebase is active
