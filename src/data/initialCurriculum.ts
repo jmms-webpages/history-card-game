@@ -160,6 +160,9 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
     Legendary: 0.10,
     Mythical: 0.01429
   },
-  adminUids: ['jaf2jc@bearworks.jackson.sparcc.org'],
+  adminUids: [
+    'jaf2jc@bearworks.jackson.sparcc.org',
+    'jaf2jc@jackson.sparcc.org'
+  ],
   classroomTimezone: 'America/New_York' // Ohio Eastern Time
 };

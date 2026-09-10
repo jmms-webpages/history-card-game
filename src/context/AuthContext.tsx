@@ -40,10 +40,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const LOCAL_STORAGE_USER_KEY = 'history_card_quest_user';
 const LOCAL_STORAGE_STUDENT_VIEW_KEY = 'history_card_quest_student_view';
 
+// Strict authorized school district email domains
+export const ALLOWED_EMAIL_DOMAINS = [
+  'bearworks.jackson.sparcc.org',
+  'jackson.sparcc.org'
+];
+
+export const isAllowedEmailDomain = (email?: string | null): boolean => {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return ALLOWED_EMAIL_DOMAINS.some(domain => normalized.endsWith(`@${domain}`));
+};
+
 export const isUserAdminEmail = (email?: string | null): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  if (normalized === 'jaf2jc@bearworks.jackson.sparcc.org' || normalized.startsWith('jaf2jc@')) return true;
+  if (
+    normalized === 'jaf2jc@bearworks.jackson.sparcc.org' ||
+    normalized === 'jaf2jc@jackson.sparcc.org' ||
+    normalized.startsWith('jaf2jc@')
+  ) {
+    return true;
+  }
   return (DEFAULT_GAME_SETTINGS.adminUids || []).some(
     adminEmail => adminEmail.trim().toLowerCase() === normalized
   );
@@ -56,6 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.email && !isAllowedEmailDomain(parsed.email)) {
+          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+          return null;
+        }
         // Ensure master admin has admin role
         if (isUserAdminEmail(parsed.email)) {
           parsed.role = 'admin';
@@ -181,14 +203,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured) {
       try {
         unsubscribe = onAuthStateChanged(auth, async (user) => {
-          setCurrentUser(user);
           if (user) {
+            // Strictly enforce district domain authorization
+            if (user.email && !isAllowedEmailDomain(user.email)) {
+              console.warn("Unauthorized domain blocked in auth listener:", user.email);
+              await fbSignOut(auth);
+              setCurrentUser(null);
+              saveProfileLocally(null);
+              setError(`Access Restricted: "${user.email}" is not authorized. You must sign in using your Jackson Local Schools account (@bearworks.jackson.sparcc.org or @jackson.sparcc.org).`);
+              setLoading(false);
+              return;
+            }
+
+            setCurrentUser(user);
             const isUserAdmin = isUserAdminEmail(user.email);
             await syncFirestoreProfile(user.uid, {
               displayName: user.displayName || (isUserAdmin ? 'Teacher & Director' : '8th Grade Student'),
               email: user.email || undefined,
               role: isUserAdmin ? 'admin' : 'student'
             });
+          } else {
+            setCurrentUser(null);
           }
           setLoading(false);
         });
@@ -214,6 +249,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const fbUser = result.user;
+
+          // Strictly enforce district domain authorization
+          if (fbUser.email && !isAllowedEmailDomain(fbUser.email)) {
+            await fbSignOut(auth);
+            setCurrentUser(null);
+            saveProfileLocally(null);
+            setError(`Access Restricted: "${fbUser.email}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`);
+            return;
+          }
+
           setCurrentUser(fbUser);
           const isUserAdmin = isUserAdminEmail(fbUser.email);
           await syncFirestoreProfile(fbUser.uid, {
@@ -234,6 +279,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Resilient Google Account Sign-In (Defaults automatically to student)
       const email = customEmail?.trim().toLowerCase() || 'student@bearworks.jackson.sparcc.org';
+
+      // Strictly enforce district domain authorization
+      if (!isAllowedEmailDomain(email)) {
+        setError(`Access Restricted: "${email}" is not authorized. You must use a @bearworks.jackson.sparcc.org or @jackson.sparcc.org email address.`);
+        return;
+      }
+
       const isUserAdmin = isUserAdminEmail(email);
       const name = customName?.trim() || (isUserAdmin ? 'Teacher & Director' : (email.startsWith('student') ? '8th Grade Student' : email.split('@')[0]));
       const uid = 'google_' + email.replace(/[^a-zA-Z0-9]/g, '_');

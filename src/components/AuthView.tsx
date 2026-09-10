@@ -12,15 +12,25 @@ export const AuthView: React.FC = () => {
     loginWithGoogle();
   };
 
-  const handleTeacherDirectorSignIn = () => {
-    loginWithGoogle('jaf2jc@bearworks.jackson.sparcc.org', 'Teacher & Director');
+  const handleTeacherDirectorSignIn = (preferredEmail: string = 'jaf2jc@bearworks.jackson.sparcc.org') => {
+    loginWithGoogle(preferredEmail, 'Teacher & Director');
   };
+
+  const [formValidationWarning, setFormValidationWarning] = useState<string | null>(null);
 
   const handleStudentGoogleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    const email = studentEmail.trim() || 'student@bearworks.jackson.sparcc.org';
+    setFormValidationWarning(null);
+    const email = studentEmail.trim().toLowerCase();
+    
+    if (email && !email.endsWith('@bearworks.jackson.sparcc.org') && !email.endsWith('@jackson.sparcc.org')) {
+      setFormValidationWarning('District email required: Must end in @bearworks.jackson.sparcc.org or @jackson.sparcc.org');
+      return;
+    }
+
+    const finalEmail = email || 'student@bearworks.jackson.sparcc.org';
     const name = studentName.trim() || '8th Grade Student';
-    loginWithGoogle(email, name);
+    loginWithGoogle(finalEmail, name);
   };
 
   return (
@@ -73,7 +83,7 @@ export const AuthView: React.FC = () => {
           <div className="text-center mb-6">
             <h2 className="text-lg font-bold text-slate-100">Sign In with Google</h2>
             <p className="text-xs text-slate-400 mt-1">
-              Connect using your Jackson Local Schools Google account.
+              Authorized for Jackson Local Schools (<span className="text-amber-300 font-mono">@bearworks.jackson.sparcc.org</span> & <span className="text-amber-300 font-mono">@jackson.sparcc.org</span>)
             </p>
           </div>
 
@@ -118,26 +128,38 @@ export const AuthView: React.FC = () => {
           </div>
 
           {/* Educator / Director Dedicated Sign-In */}
-          <div className="mt-4 p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col gap-2">
+          <div className="mt-4 p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
                 <span>Classroom Educator & Director Portal</span>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400">
-              Are you the classroom teacher or administrator? Sign in to unlock the Teacher Dashboard & Admin Console.
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Teacher & Director privileges are automatically activated when signing in with <strong className="text-amber-200 font-mono">jaf2jc@bearworks.jackson.sparcc.org</strong> or <strong className="text-amber-200 font-mono">jaf2jc@jackson.sparcc.org</strong>.
             </p>
-            <button
-              id="teacher-signin-button"
-              type="button"
-              onClick={handleTeacherDirectorSignIn}
-              disabled={loading}
-              className="w-full py-2 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 font-medium text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Sign in as Teacher / Director (jaf2jc@bearworks...)</span>
-              <ArrowRight className="w-3.5 h-3.5 text-amber-300" />
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                id="teacher-signin-bearworks"
+                type="button"
+                onClick={() => handleTeacherDirectorSignIn('jaf2jc@bearworks.jackson.sparcc.org')}
+                disabled={loading}
+                className="w-full py-2 px-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 font-medium text-[11px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>Director (@bearworks)</span>
+                <ArrowRight className="w-3 h-3 text-amber-300" />
+              </button>
+              <button
+                id="teacher-signin-jackson"
+                type="button"
+                onClick={() => handleTeacherDirectorSignIn('jaf2jc@jackson.sparcc.org')}
+                disabled={loading}
+                className="w-full py-2 px-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 font-medium text-[11px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>Director (@jackson)</span>
+                <ArrowRight className="w-3 h-3 text-amber-300" />
+              </button>
+            </div>
           </div>
 
           {/* Optional Student Google Account Section */}
@@ -157,15 +179,24 @@ export const AuthView: React.FC = () => {
 
             {showStudentInput && (
               <form onSubmit={handleStudentGoogleSignIn} className="mt-3 space-y-2.5 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                {formValidationWarning && (
+                  <div className="p-2 rounded-lg bg-rose-950/80 border border-rose-800 text-[11px] text-rose-300 flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                    <span>{formValidationWarning}</span>
+                  </div>
+                )}
                 <div>
                   <label className="block text-[11px] text-slate-400 mb-1 font-medium">
-                    Student Google Email
+                    Student Google Email (@bearworks or @jackson)
                   </label>
                   <input
                     type="email"
                     required
                     value={studentEmail}
-                    onChange={(e) => setStudentEmail(e.target.value)}
+                    onChange={(e) => {
+                      setStudentEmail(e.target.value);
+                      if (formValidationWarning) setFormValidationWarning(null);
+                    }}
                     placeholder="student@bearworks.jackson.sparcc.org"
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   />
