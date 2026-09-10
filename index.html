@@ -10,7 +10,14 @@
     <meta property="og:description" content="An educational trading-card quest game for 8th grade Ohio Social Studies." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script type="module" crossorigin src="./assets/index-B94IjvdW.js"></script>
+    <script>
+      // Automatic fallback if GitHub Pages is configured to serve from the repository root
+      if (window.location.hostname.endsWith('github.io') && !window.location.pathname.includes('/docs')) {
+        var cleanPath = window.location.pathname.replace(/\/+$/, '');
+        window.location.replace(cleanPath + '/docs/' + window.location.search + window.location.hash);
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-ox6RK8Zt.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-ANJrdVr2.css">
   </head>
   <body>
