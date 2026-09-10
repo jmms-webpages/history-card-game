@@ -189,28 +189,58 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 'Common';
   };
 
-  // Draw 1 card matching rarity and pack theme
+  // Rarity tiers ordered highest -> lowest, used to find the nearest
+  // available rarity WITHOUT ever leaving the pack's own card pool.
+  const RARITY_ORDER: CardRarity[] = ['Mythical', 'Legendary', 'Rare', 'Uncommon', 'Common'];
+
+  // The set of cards that actually belong to a given pack. A card belongs
+  // to a pack if its packTheme matches the pack's theme, or (as a fallback
+  // link) its unitId matches the unit a "pack-unit-N" pack represents.
+  const getPackCardPool = (pack: Pack, activeCards: Card[]): Card[] => {
+    return activeCards.filter(c =>
+      c.packTheme === pack.theme ||
+      (pack.packId.startsWith('pack-unit-') && c.unitId === pack.packId.replace('pack-', ''))
+    );
+  };
+
+  // Draw 1 card for this pack. Cards are ALWAYS drawn from the pack's own
+  // pool -- a pack can never hand out a card from a different pack/theme.
+  // If the pack itself has no linked cards at all (e.g. a curated
+  // "all eras" pack), we intentionally draw from every active card instead,
+  // since that pack has no card pool of its own by design.
   const drawCard = (rarity: CardRarity, pack: Pack): Card => {
     const activeCards = cards.filter(c => c.active);
+    const packPool = getPackCardPool(pack, activeCards);
+    const scopedPool = packPool.length > 0 ? packPool : activeCards;
 
-    // 1. Try theme match + exact rarity
-    let pool = activeCards.filter(c => 
-      (c.packTheme === pack.theme || (pack.packId.includes('unit-') && c.unitId === pack.packId.replace('pack-', ''))) &&
-      c.rarity === rarity
-    );
+    // 1. Try the exact rolled rarity within this pack's own cards.
+    let candidates = scopedPool.filter(c => c.rarity === rarity);
 
-    // 2. If no card found in theme with this rarity, fallback to any card of this rarity
-    if (pool.length === 0) {
-      pool = activeCards.filter(c => c.rarity === rarity);
+    // 2. If this pack doesn't stock that exact rarity, step to the nearest
+    // available rarity -- checking one tier down before one tier up at each
+    // step -- but never leave the pack's own pool.
+    if (candidates.length === 0) {
+      const startIndex = RARITY_ORDER.indexOf(rarity);
+      for (let offset = 1; offset < RARITY_ORDER.length && candidates.length === 0; offset++) {
+        const oneTierDown = RARITY_ORDER[startIndex + offset];
+        const oneTierUp = RARITY_ORDER[startIndex - offset];
+        if (oneTierDown) {
+          candidates = scopedPool.filter(c => c.rarity === oneTierDown);
+        }
+        if (candidates.length === 0 && oneTierUp) {
+          candidates = scopedPool.filter(c => c.rarity === oneTierUp);
+        }
+      }
     }
 
-    // 3. If still empty (e.g. no active cards of that rarity), fallback to all active
-    if (pool.length === 0) {
-      pool = activeCards;
+    // 3. Absolute last resort (a pack with active cards of no rarity at
+    // all is misconfigured) -- still stay within the pack's own pool.
+    if (candidates.length === 0) {
+      candidates = scopedPool;
     }
 
-    const randomIndex = Math.floor(Math.random() * pool.length);
-    return pool[randomIndex];
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    return candidates[randomIndex];
   };
 
   // Open 5-Card Booster Pack
