@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build && rm -rf docs/assets && cp -r dist/* docs/ && touch docs/.nojekyll",
+    "deploy:gh-pages": "npm run build && git worktree add /tmp/gh-pages origin/gh-pages && rm -rf /tmp/gh-pages/* && cp -r dist/* /tmp/gh-pages/ && touch /tmp/gh-pages/.nojekyll && cd /tmp/gh-pages && git add -A && git commit -m 'Deploy to gh-pages' && git push origin HEAD:gh-pages && cd - && git worktree remove /tmp/gh-pages",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
