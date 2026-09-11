@@ -361,7 +361,6 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({ onNa
                     <th className="py-3 px-4 text-center">Coins</th>
                     <th className="py-3 px-4 text-center">Binder Cards</th>
                     <th className="py-3 px-4 text-center">Trivia Accuracy</th>
-                    <th className="py-3 px-4 text-center">Trades</th>
                     <th className="py-3 px-4 text-right">Teacher Actions</th>
                   </tr>
                 </thead>
@@ -422,12 +421,6 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({ onNa
                             <div className="text-[10px] text-slate-400 font-mono">
                               {accuracyPercent}% correct
                             </div>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="font-mono font-bold text-emerald-300">
-                              {student.tradesCompleted}
-                            </span>
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
