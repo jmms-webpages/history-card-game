@@ -272,7 +272,7 @@ export const ProfileView: React.FC = () => {
             <ul className="mt-3 space-y-2 text-xs text-slate-300">
               <li className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Your email address is confidential and is never displayed to other students during trading or browsing.</span>
+                <span>Your email address is confidential and is never displayed to other students.</span>
               </li>
               <li className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -280,7 +280,7 @@ export const ProfileView: React.FC = () => {
               </li>
               <li className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Only your display name, chosen historical avatar, and unique safe identifier are visible to trading peers.</span>
+                <span>Only your display name, chosen historical avatar, and unique safe identifier ever appear on the classroom Honor Roll.</span>
               </li>
               <li className="flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
