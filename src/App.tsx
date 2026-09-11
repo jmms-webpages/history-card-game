@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QuestionsProvider } from './context/QuestionsContext';
 import { CardsProvider } from './context/CardsContext';
-import { TradingProvider } from './context/TradingContext';
 import { NavigationTab } from './types';
 import { Sidebar } from './components/Sidebar';
 import { AuthView } from './components/AuthView';
@@ -15,7 +14,6 @@ import { DashboardView } from './components/DashboardView';
 import { QuestionsView } from './components/QuestionsView';
 import { PacksView } from './components/PacksView';
 import { CollectionView } from './components/CollectionView';
-import { TradingView } from './components/TradingView';
 import { ProfileView } from './components/ProfileView';
 import { TeacherDashboardView } from './components/TeacherDashboardView';
 import { AdminDashboardView } from './components/AdminDashboardView';
@@ -101,7 +99,6 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'questions' && <QuestionsView />}
           {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
           {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
-          {currentTab === 'trading' && <TradingView />}
           {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
           {currentTab === 'profile' && <ProfileView />}
           {currentTab === 'teacher' && <TeacherDashboardView onNavigate={setCurrentTab} />}
@@ -129,9 +126,7 @@ export default function App() {
     <AuthProvider>
       <QuestionsProvider>
         <CardsProvider>
-          <TradingProvider>
-            <MainAppContent />
-          </TradingProvider>
+          <MainAppContent />
         </CardsProvider>
       </QuestionsProvider>
     </AuthProvider>
