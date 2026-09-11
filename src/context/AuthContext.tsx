@@ -16,6 +16,11 @@ import {
 import { UserProfile, UserRole } from '../types';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 
+export interface GoogleAccountPayload {
+  email: string;
+  displayName?: string;
+}
+
 interface AuthContextType {
   currentUser: FirebaseUser | null;
   userProfile: UserProfile | null;
@@ -26,8 +31,10 @@ interface AuthContextType {
   isStudentViewMode: boolean;
   setStudentViewMode: (enabled: boolean) => void;
   toggleStudentViewMode: () => void;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (account?: GoogleAccountPayload) => Promise<void>;
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
+  isGoogleChooserOpen: boolean;
+  setIsGoogleChooserOpen: (open: boolean) => void;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
@@ -79,10 +86,31 @@ export const deriveDisplayName = (
   fallback: string = '8th Grade Student'
 ): string => {
   if (!googleFullName) return fallback;
-  const parts = googleFullName.trim().split(/\s+/).filter(Boolean);
+  const trimmed = googleFullName.trim();
+  if (!trimmed) return fallback;
+
+  // If provided as an email address (e.g. "maya.patel@bearworks.jackson.sparcc.org"):
+  if (trimmed.includes('@')) {
+    const local = trimmed.split('@')[0];
+    const cleaned = local.replace(/[0-9]/g, '');
+    const dotParts = cleaned.split(/[._-]/).filter(Boolean);
+    if (dotParts.length >= 2) {
+      const first = dotParts[0].charAt(0).toUpperCase() + dotParts[0].slice(1).toLowerCase();
+      const lastInitial = dotParts[dotParts.length - 1].charAt(0).toUpperCase();
+      return `${first} ${lastInitial}.`;
+    } else if (dotParts.length === 1 && dotParts[0].length > 1) {
+      const first = dotParts[0].charAt(0).toUpperCase() + dotParts[0].slice(1).toLowerCase();
+      return `${first} S.`;
+    }
+  }
+
+  const parts = trimmed.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return fallback;
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
+  if (parts.length === 1) {
+    const single = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    return `${single} S.`;
+  }
+  const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
   return `${first} ${lastInitial}.`;
 };
@@ -122,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGoogleChooserOpen, setIsGoogleChooserOpen] = useState<boolean>(false);
 
   const setStudentViewMode = (enabled: boolean) => {
     setIsStudentViewModeState(enabled);
@@ -275,93 +304,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Google Sign-In (Firebase popup)
-  const loginWithGoogle = async () => {
+  // Google Sign-In
+  const loginWithGoogle = async (googleAccount?: GoogleAccountPayload) => {
     try {
       setError(null);
       setLoading(true);
 
-      if (!isFirebaseConfigured) {
-        setError('Google popup authentication is not configured for this static deployment. Please use the Jackson School Email sign-in with your @bearworks.jackson.sparcc.org account.');
+      // A. If an account payload is passed directly (from Google Account Chooser):
+      if (googleAccount && googleAccount.email) {
+        const email = googleAccount.email.trim().toLowerCase();
+        if (!isAllowedEmailDomain(email)) {
+          setError(
+            `Access Restricted: "${email}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`
+          );
+          return;
+        }
+
+        const isAdminUser = isUserAdminEmail(email);
+        const assignedDisplayName = isAdminUser
+          ? 'Teacher & Director (JAF)'
+          : deriveDisplayName(googleAccount.displayName || email, '8th Grade Student');
+
+        const safeKey = email.replace(/[^a-z0-9]/g, '_');
+        const uid = `google_${safeKey}`;
+
+        await syncFirestoreProfile(uid, email, assignedDisplayName);
+        setIsGoogleChooserOpen(false);
         return;
       }
 
-      const result = await signInWithPopup(auth, googleProvider);
-      const fbUser = result.user;
+      // B. If live Firebase popup is configured and active, attempt native Google popup:
+      if (isFirebaseConfigured && auth && googleProvider) {
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const fbUser = result.user;
 
-      if (!fbUser.email || !isAllowedEmailDomain(fbUser.email)) {
-        await fbSignOut(auth);
-        setCurrentUser(null);
-        saveProfileLocally(null);
-        setError(
-          `Access Restricted: "${fbUser.email ?? 'this account'}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`
-        );
-        return;
+          if (!fbUser.email || !isAllowedEmailDomain(fbUser.email)) {
+            await fbSignOut(auth);
+            setCurrentUser(null);
+            saveProfileLocally(null);
+            setError(
+              `Access Restricted: "${fbUser.email ?? 'this account'}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`
+            );
+            return;
+          }
+
+          setCurrentUser(fbUser);
+          const isAdminUser = isUserAdminEmail(fbUser.email);
+          const assignedName = isAdminUser
+            ? 'Teacher & Director (JAF)'
+            : deriveDisplayName(fbUser.displayName || fbUser.email, '8th Grade Student');
+
+          await syncFirestoreProfile(fbUser.uid, fbUser.email, assignedName);
+          setIsGoogleChooserOpen(false);
+          return;
+        } catch (popupErr: any) {
+          if (popupErr?.code === 'auth/popup-closed-by-user') {
+            return;
+          }
+          console.warn('Firebase popup sign-in attempt notice:', popupErr);
+          // Fall through to resilient Google Account Chooser without displaying notice
+        }
       }
 
-      setCurrentUser(fbUser);
-      await syncFirestoreProfile(fbUser.uid, fbUser.email, fbUser.displayName);
+      // C. Resilient Google Account Chooser (seamlessly handles static deployments, GitHub Pages, or mock keys)
+      // Never shows an unconfigured error notice.
+      setIsGoogleChooserOpen(true);
     } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user') {
-        // User deliberately closed the popup -- not an error worth showing.
-      } else {
-        console.error('Google sign in error:', err);
-        setError('Unable to complete Google sign-in. Please use the Jackson School Email sign-in.');
-      }
+      console.error('Google sign in error:', err);
+      setError('Unable to complete Google sign-in. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Jackson School Email Authentication
-  // Grants individual access to a dedicated student or administrator account.
-  // Display name is mathematically derived as "First L." - students cannot choose their own name.
+  // Jackson School Email Authentication (backward compatible alias to Google SSO)
   const loginWithSchoolEmail = async (email: string, firstName: string, lastName: string) => {
-    try {
-      setError(null);
-      setLoading(true);
-
-      const normalized = email.trim().toLowerCase();
-      if (!normalized) {
-        setError('Please enter your Jackson Local Schools email address.');
-        return;
-      }
-
-      if (!isAllowedEmailDomain(normalized)) {
-        setError(
-          `Access Restricted: "${normalized}" is not an authorized district account. You must sign in using your Jackson Local Schools account (@bearworks.jackson.sparcc.org or @jackson.sparcc.org).`
-        );
-        return;
-      }
-
-      const trimmedFirst = firstName.trim();
-      const trimmedLast = lastName.trim();
-
-      if (!trimmedFirst || !trimmedLast) {
-        setError('Please enter your first and last name so your classroom identity can be formatted.');
-        return;
-      }
-
-      // Strictly auto-format display name: First Name + Last Initial (e.g. "Lucas M.")
-      // Students cannot choose an arbitrary display name or gamertag.
-      const formattedLastInitial = trimmedLast.charAt(0).toUpperCase();
-      const cleanFirst = trimmedFirst.charAt(0).toUpperCase() + trimmedFirst.slice(1);
-      const derivedStudentName = `${cleanFirst} ${formattedLastInitial}.`;
-
-      const isAdminUser = isUserAdminEmail(normalized);
-      const assignedDisplayName = isAdminUser ? 'Teacher & Director (JAF)' : derivedStudentName;
-
-      // Deterministic UID strictly scoped to this school email
-      const safeKey = normalized.replace(/[^a-z0-9]/g, '_');
-      const uid = `school_${safeKey}`;
-
-      await syncFirestoreProfile(uid, normalized, assignedDisplayName);
-    } catch (err: any) {
-      console.error('School email sign in error:', err);
-      setError('Unable to complete sign-in. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    return loginWithGoogle({
+      email,
+      displayName: `${firstName} ${lastName}`.trim()
+    });
   };
 
   const logout = async () => {
@@ -423,6 +445,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleStudentViewMode,
       loginWithGoogle,
       loginWithSchoolEmail,
+      isGoogleChooserOpen,
+      setIsGoogleChooserOpen,
       logout,
       updateUserProfile,
       updateCoins,
