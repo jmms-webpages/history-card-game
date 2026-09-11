@@ -33,7 +33,6 @@ interface CardsContextType {
     duplicatesCount: number;
     potentialDuplicateSellValue: number;
   };
-  exchangeCardsForTrade: (cardsToGiveIds: string[], cardsToReceiveIds: string[]) => Promise<boolean>;
   addCustomCard: (card: Omit<Card, 'cardId'>) => void;
   toggleCardActive: (cardId: string) => void;
 }
@@ -51,7 +50,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_CARDS_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: Card[] = JSON.parse(saved);
+        // If new cards have been added to INITIAL_CARDS since this browser
+        // last cached the card list, merge them in automatically instead of
+        // silently hiding them behind a stale cache.
+        const existingIds = new Set(parsed.map(c => c.cardId));
+        const missingInitials = INITIAL_CARDS.filter(c => !existingIds.has(c.cardId));
+        return missingInitials.length > 0 ? [...parsed, ...missingInitials] : parsed;
       }
     } catch {
       // ignore
@@ -417,68 +422,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
-  // Atomic exchange of cards for peer trade
-  const exchangeCardsForTrade = async (cardsToGiveIds: string[], cardsToReceiveIds: string[]): Promise<boolean> => {
-    // 1. Verify user still possesses all cardsToGiveIds
-    const remainingToGive = [...cardsToGiveIds];
-    const currentInv = [...inventory];
-    const itemsToRemoveIndices: number[] = [];
-
-    for (const giveCardId of remainingToGive) {
-      const idx = currentInv.findIndex((item, i) => item.cardId === giveCardId && !itemsToRemoveIndices.includes(i));
-      if (idx === -1) {
-        throw new Error(`You no longer possess the card required for this trade: ${giveCardId}`);
-      }
-      itemsToRemoveIndices.push(idx);
-    }
-
-    // 2. Remove the given cards
-    const updatedInventory = currentInv.filter((_, idx) => !itemsToRemoveIndices.includes(idx));
-
-    // 3. Add the received cards
-    const now = new Date().toISOString();
-    cardsToReceiveIds.forEach((receiveCardId, i) => {
-      const card = cardMap.get(receiveCardId);
-      const isDuplicate = updatedInventory.some(item => item.cardId === receiveCardId);
-      const instanceId = `inst-trade-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`;
-      const newItem: InventoryItem = {
-        instanceId,
-        cardId: receiveCardId,
-        obtainedAt: now,
-        isDuplicate,
-        card
-      };
-      updatedInventory.push(newItem);
-
-      // Async Firestore write if configured
-      if (isFirebaseConfigured && db && doc && setDoc && userProfile?.uid) {
-        const itemRef = doc(db, 'users', userProfile.uid, 'inventory', instanceId);
-        setDoc(itemRef, {
-          instanceId,
-          cardId: receiveCardId,
-          obtainedAt: now,
-          isDuplicate,
-          obtainedVia: 'trade'
-        }).catch(() => {});
-      }
-    });
-
-    // 4. Async delete removed items from Firestore
-    if (isFirebaseConfigured && db && doc && deleteDoc && userProfile?.uid) {
-      itemsToRemoveIndices.forEach(idx => {
-        const item = currentInv[idx];
-        if (item) {
-          const itemRef = doc(db, 'users', userProfile.uid, 'inventory', item.instanceId);
-          deleteDoc(itemRef).catch(() => {});
-        }
-      });
-    }
-
-    // 5. Commit state & localStorage
-    saveInventory(updatedInventory);
-    return true;
-  };
-
   // Stats calculation
   const stats = useMemo(() => {
     const totalCards = inventory.length;
@@ -554,7 +497,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isCardOwned,
       getCardCopies,
       stats,
-      exchangeCardsForTrade,
       addCustomCard,
       toggleCardActive
     }}>
