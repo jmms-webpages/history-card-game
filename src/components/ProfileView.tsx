@@ -97,16 +97,18 @@ export const ProfileView: React.FC = () => {
             </div>
           </div>
 
-          {/* Test Coins / Signout Actions */}
+          {/* Test Coins (admin/dev only -- never shown to students, to protect the coin economy) / Signout Actions */}
           <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
-            <button
-              onClick={handleClaimBonusCoins}
-              className="py-2 px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-              title="Practice earning coins"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>+25 Test Coins</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleClaimBonusCoins}
+                className="py-2 px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                title="Admin/testing only: not shown to students"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>+25 Test Coins (Admin)</span>
+              </button>
+            )}
             <button
               onClick={logout}
               className="py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 border border-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
