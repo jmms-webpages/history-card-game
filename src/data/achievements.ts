@@ -76,84 +76,122 @@ export const HISTORICAL_ACHIEVEMENTS: Achievement[] = [
       target: 30
     }
   },
+  {
+    id: 'binder-completionist',
+    title: 'Keeper of All Ages',
+    description: 'Collect 80 unique historical cards in your binder.',
+    category: 'collection',
+    icon: '🏆',
+    coinReward: 300,
+    requirement: {
+      type: 'unique_cards',
+      target: 80
+    }
+  },
 
-  // Era Mastery
+  // Era Mastery (targets scaled to each unit's expanded ~15-17 card pool)
   {
     id: 'unit-1-mastery',
     title: 'Age of Exploration',
-    description: 'Collect 4 or more cards from Unit 1 (First Peoples & Exploration).',
+    description: 'Collect 8 or more cards from Unit 1 (First Peoples & Exploration).',
     category: 'collection',
     icon: '⛵',
-    coinReward: 40,
+    coinReward: 45,
     requirement: {
       type: 'unit_cards',
-      target: 4,
+      target: 8,
       unitId: 'unit-1'
     }
   },
   {
     id: 'unit-2-mastery',
     title: 'Colonial Chronicle',
-    description: 'Collect 4 or more cards from Unit 2 (Colonies & Revolution).',
+    description: 'Collect 8 or more cards from Unit 2 (Colonial America & Middle Passage).',
     category: 'collection',
     icon: '🔔',
-    coinReward: 40,
+    coinReward: 45,
     requirement: {
       type: 'unit_cards',
-      target: 4,
+      target: 8,
       unitId: 'unit-2'
     }
   },
   {
     id: 'unit-3-mastery',
-    title: 'Constitutional Delegate',
-    description: 'Collect 4 or more cards from Unit 3 (Constitution & New Republic).',
+    title: 'Revolutionary Vanguard',
+    description: 'Collect 9 or more cards from Unit 3 (Revolution & Enlightenment).',
     category: 'collection',
-    icon: '⚖️',
-    coinReward: 40,
+    icon: '🔥',
+    coinReward: 45,
     requirement: {
       type: 'unit_cards',
-      target: 4,
+      target: 9,
       unitId: 'unit-3'
     }
   },
   {
     id: 'unit-4-mastery',
-    title: 'Union Defender',
-    description: 'Collect 4 or more cards from Unit 4 (Civil War & Reconstruction).',
+    title: 'Constitutional Delegate',
+    description: 'Collect 8 or more cards from Unit 4 (Constitution & Bill of Rights).',
     category: 'collection',
-    icon: '🦅',
-    coinReward: 40,
+    icon: '⚖️',
+    coinReward: 45,
     requirement: {
       type: 'unit_cards',
-      target: 4,
+      target: 8,
       unitId: 'unit-4'
     }
   },
-
-  // Classroom Trading
   {
-    id: 'first-trade',
-    title: 'Frontier Merchant',
-    description: 'Complete your first successful card exchange with a classroom peer.',
-    category: 'trading',
-    icon: '🤝',
+    id: 'unit-5-mastery',
+    title: 'Frontier Statesman',
+    description: 'Collect 8 or more cards from Unit 5 (The Ohio Frontier & Early Republic).',
+    category: 'collection',
+    icon: '🗺️',
     coinReward: 45,
     requirement: {
-      type: 'trades_completed',
-      target: 1
+      type: 'unit_cards',
+      target: 8,
+      unitId: 'unit-5'
     }
   },
   {
-    id: 'master-trader',
-    title: 'Silk Road Diplomat',
-    description: 'Complete 3 successful card trades with classroom peers.',
-    category: 'trading',
-    icon: '🌐',
-    coinReward: 90,
+    id: 'unit-6-mastery',
+    title: 'Trailblazer of the West',
+    description: 'Collect 8 or more cards from Unit 6 (Westward Trails & Manifest Destiny).',
+    category: 'collection',
+    icon: '🐎',
+    coinReward: 45,
     requirement: {
-      type: 'trades_completed',
-      target: 3
+      type: 'unit_cards',
+      target: 8,
+      unitId: 'unit-6'
+    }
+  },
+  {
+    id: 'unit-7-mastery',
+    title: 'Conductor of Freedom',
+    description: "Collect 8 or more cards from Unit 7 (Abolition & Ohio's Underground Railroad).",
+    category: 'collection',
+    icon: '🕯️',
+    coinReward: 45,
+    requirement: {
+      type: 'unit_cards',
+      target: 8,
+      unitId: 'unit-7'
+    }
+  },
+  {
+    id: 'unit-8-mastery',
+    title: 'Union Defender',
+    description: 'Collect 9 or more cards from Unit 8 (Civil War & Reconstruction).',
+    category: 'collection',
+    icon: '🦅',
+    coinReward: 45,
+    requirement: {
+      type: 'unit_cards',
+      target: 9,
+      unitId: 'unit-8'
     }
   },
 
