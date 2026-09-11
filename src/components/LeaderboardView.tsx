@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
 import { useQuestions } from '../context/QuestionsContext';
-import { useTrading } from '../context/TradingContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { INITIAL_CLASSROOM_STUDENTS } from '../data/roster';
 import { getAvatarById } from '../data/avatars';
@@ -14,7 +13,6 @@ import {
   Medal, 
   Coins, 
   BookOpen, 
-  Repeat, 
   Sparkles, 
   CheckCircle2, 
   Lock, 
@@ -33,20 +31,16 @@ interface LeaderboardViewProps {
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
-  const { cards, inventoryCards, uniqueOwnedCardsCount, totalCardsInSet } = useCards();
+  const { inventoryCards, stats } = useCards();
   const { dailyActivity } = useQuestions();
-  const { trades } = useTrading();
 
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'achievements'>('leaderboard');
-  const [rankingMetric, setRankingMetric] = useState<'cards' | 'trivia' | 'trades'>('cards');
+  const [rankingMetric, setRankingMetric] = useState<'cards' | 'trivia'>('cards');
   const [achievementCategory, setAchievementCategory] = useState<string>('all');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [justClaimedReward, setJustClaimedReward] = useState<{ id: string; reward: number } | null>(null);
 
   // Student stats for current user
-  const currentUserTradesCount = useMemo(() => {
-    return trades.filter(t => t.status === 'accepted').length;
-  }, [trades]);
 
   const currentUserStudent: ClassroomStudent = useMemo(() => {
     return {
@@ -55,14 +49,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
       avatar: userProfile?.avatar || 'pioneer',
       classroomCode: userProfile?.classroomCode || 'JMMS-8TH-2026',
       coins: userProfile?.coins || 0,
-      uniqueCards: uniqueOwnedCardsCount,
+      uniqueCards: stats.uniqueCards,
       totalCards: inventoryCards.length,
       questionsAnswered: dailyActivity?.questionsAnswered || 0,
       correctAnswers: dailyActivity?.correctAnswers || 0,
-      tradesCompleted: currentUserTradesCount,
       lastActive: 'Just now'
     };
-  }, [userProfile, uniqueOwnedCardsCount, inventoryCards.length, dailyActivity, currentUserTradesCount]);
+  }, [userProfile, stats.uniqueCards, inventoryCards.length, dailyActivity]);
 
   // Combined sorted roster
   const sortedStudents = useMemo(() => {
@@ -85,9 +78,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
         return (b.questionsAnswered > 0 ? b.correctAnswers / b.questionsAnswered : 0) -
                (a.questionsAnswered > 0 ? a.correctAnswers / a.questionsAnswered : 0);
       }
-      if (rankingMetric === 'trades') {
-        return b.tradesCompleted - a.tradesCompleted;
-      }
       return 0;
     });
   }, [currentUserStudent, rankingMetric]);
@@ -108,7 +98,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
         current = dailyActivity?.correctAnswers || 0;
         break;
       case 'unique_cards':
-        current = uniqueOwnedCardsCount;
+        current = stats.uniqueCards;
         break;
       case 'total_cards':
         current = inventoryCards.length;
@@ -123,9 +113,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
         current = ownedUnitCards.size;
         break;
       }
-      case 'trades_completed':
-        current = currentUserTradesCount;
-        break;
       case 'mythical_pulled': {
         const hasMythical = inventoryCards.some(
           item => item.card?.rarity === 'Legendary' || item.card?.rarity === 'Mythical'
@@ -162,7 +149,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const completedAchievementsCount = useMemo(() => {
     return HISTORICAL_ACHIEVEMENTS.filter(a => checkAchievementProgress(a).isCompleted).length;
-  }, [userClaimedList, uniqueOwnedCardsCount, inventoryCards, dailyActivity, currentUserTradesCount]);
+  }, [userClaimedList, stats.uniqueCards, inventoryCards, dailyActivity]);
 
   const filteredAchievements = useMemo(() => {
     if (achievementCategory === 'all') return HISTORICAL_ACHIEVEMENTS;
@@ -192,7 +179,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
               Rankings & Historical Milestones
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
-              Track classroom standing across trivia accuracy, card collecting, and peer trading. Unlock historical achievements to earn bonus coin grants!
+              Track classroom standing across trivia accuracy and card collecting. Unlock historical achievements to earn bonus coin grants!
             </p>
           </div>
 
@@ -275,19 +262,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                 <HelpCircle className="w-3.5 h-3.5" />
                 <span>Trivia Accuracy</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => setRankingMetric('trades')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  rankingMetric === 'trades'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Repeat className="w-3.5 h-3.5" />
-                <span>Trades Completed</span>
-              </button>
             </div>
           </div>
 
@@ -348,7 +322,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                   </div>
                   <p className="text-[11px] text-slate-400 mb-3">{avatar.name} Persona</p>
 
-                  <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3 grid grid-cols-3 gap-1 text-center">
+                  <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3 grid grid-cols-2 gap-1 text-center">
                     <div>
                       <div className="text-[10px] text-slate-500 uppercase font-mono">Cards</div>
                       <div className="text-xs font-black font-mono text-amber-300">{student.uniqueCards}</div>
@@ -356,10 +330,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                     <div>
                       <div className="text-[10px] text-slate-500 uppercase font-mono">Trivia</div>
                       <div className="text-xs font-black font-mono text-indigo-300">{student.correctAnswers}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-mono">Trades</div>
-                      <div className="text-xs font-black font-mono text-emerald-300">{student.tradesCompleted}</div>
                     </div>
                   </div>
                 </div>
@@ -387,7 +357,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                     <th className="py-3 px-4">Student & Persona</th>
                     <th className="py-3 px-4 text-center">Binder Progress</th>
                     <th className="py-3 px-4 text-center">Trivia Accuracy</th>
-                    <th className="py-3 px-4 text-center">Trades</th>
                     <th className="py-3 px-4 text-right">Coins</th>
                   </tr>
                 </thead>
@@ -395,7 +364,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                   {sortedStudents.map((student, index) => {
                     const avatar = getAvatarById(student.avatar);
                     const isCurrentUser = student.uid === currentUserStudent.uid;
-                    const binderPercent = Math.min(100, Math.round((student.uniqueCards / totalCardsInSet) * 100));
+                    const binderPercent = Math.min(100, Math.round((student.uniqueCards / stats.totalInSet) * 100));
                     const accuracyPercent = student.questionsAnswered > 0
                       ? Math.round((student.correctAnswers / student.questionsAnswered) * 100)
                       : 0;
@@ -435,7 +404,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                         <td className="py-3 px-4 text-center">
                           <div className="inline-flex flex-col items-center">
                             <span className="font-mono font-bold text-slate-200">
-                              {student.uniqueCards} <span className="text-slate-500 font-normal">/ {totalCardsInSet}</span>
+                              {student.uniqueCards} <span className="text-slate-500 font-normal">/ {stats.totalInSet}</span>
                             </span>
                             <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
                               <div
@@ -449,12 +418,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                         <td className="py-3 px-4 text-center">
                           <span className="font-mono font-bold text-indigo-300">
                             {student.correctAnswers} <span className="text-slate-500 font-normal">({accuracyPercent}%)</span>
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-center">
-                          <span className="font-mono font-bold text-emerald-300">
-                            {student.tradesCompleted}
                           </span>
                         </td>
 
@@ -486,7 +449,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
               { id: 'all', label: 'All Achievements' },
               { id: 'trivia', label: 'Trivia Scholars' },
               { id: 'collection', label: 'Card Collection' },
-              { id: 'trading', label: 'Classroom Trading' },
               { id: 'general', label: 'Rarity Milestones' }
             ].map(cat => (
               <button
