@@ -7,7 +7,6 @@ import {
   HelpCircle, 
   Package, 
   Library, 
-  Repeat, 
   User, 
   GraduationCap, 
   LogOut, 
@@ -48,7 +47,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'questions', label: 'Daily Trivia', icon: <HelpCircle className="w-4 h-4" /> },
     { id: 'packs', label: 'Card Packs', icon: <Package className="w-4 h-4" /> },
     { id: 'collection', label: 'Card Binder', icon: <Library className="w-4 h-4" /> },
-    { id: 'trading', label: 'Trading Post', icon: <Repeat className="w-4 h-4" /> },
     { id: 'leaderboard', label: 'Honor Roll', icon: <Trophy className="w-4 h-4" /> },
     { id: 'profile', label: 'My Scholar Profile', icon: <User className="w-4 h-4" /> }
   ];
