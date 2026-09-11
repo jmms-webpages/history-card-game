@@ -30,6 +30,27 @@ service cloud.firestore {
       );
     }
 
+    // Firestore rules can't call into Cloud Functions on the Spark (free)
+    // plan, so there is no fully server-authoritative way to verify a coin
+    // change came from a real trivia answer / pack purchase / card sale.
+    // As defense in depth, this at least blocks a single crafted write from
+    // setting coins to an arbitrary value: any write that touches `coins`
+    // must change it by exactly one of the amounts the game actually pays
+    // out or charges. MUST be kept in sync with DEFAULT_GAME_SETTINGS in
+    // data/initialCurriculum.ts if those values ever change.
+    function isAllowedCoinDelta(delta) {
+      return delta in [
+        -100,  // standardPackCost
+        10,    // correctCoinReward
+        3,     // incorrectCoinReward
+        5,     // duplicateSellValues.Common
+        15,    // duplicateSellValues.Uncommon
+        40,    // duplicateSellValues.Rare
+        150,   // duplicateSellValues.Legendary
+        500    // duplicateSellValues.Mythical
+      ];
+    }
+
     function isAdmin() {
       return isAuthenticated() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
@@ -70,10 +91,19 @@ service cloud.firestore {
       // Users can update safe profile fields (avatar, classroomCode,
       // lastLoginAt, coins). role, displayName, and email can NEVER be
       // changed by the user themself -- only an admin can change them
-      // (e.g. to promote a 'teacher').
+      // (e.g. to promote a 'teacher'). If the write touches `coins`, the
+      // change must match a real in-game reward/cost amount (see
+      // isAllowedCoinDelta) -- this stops a single crafted write from
+      // setting coins to an arbitrary number, even though it can't fully
+      // verify the underlying gameplay action without a paid Functions plan.
       allow update: if isAdmin() || (
         isOwner(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'displayName', 'email'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'displayName', 'email']) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['coins']) ||
+          isAllowedCoinDelta(request.resource.data.coins - resource.data.coins)
+        ) &&
+        request.resource.data.coins >= 0
       );
       allow delete: if isAdmin();
 
@@ -83,10 +113,19 @@ service cloud.firestore {
         allow write: if isOwner(userId) || isAdmin();
       }
 
-      // Inventory subcollection
+      // Inventory subcollection. Items can be created (pack pull) or
+      // deleted (selling a duplicate) by their owner, but never silently
+      // rewritten in place -- that would let a client swap a common card's
+      // ID for a rare one after the fact without ever "drawing" it.
       match /inventory/{instanceId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow write: if isOwner(userId) || isAdmin();
+        allow create: if (isOwner(userId) || isAdmin()) &&
+          request.resource.data.keys().hasOnly(['instanceId', 'cardId', 'obtainedAt', 'isDuplicate']) &&
+          request.resource.data.instanceId is string &&
+          request.resource.data.cardId is string &&
+          request.resource.data.isDuplicate is bool;
+        allow delete: if isOwner(userId) || isAdmin();
+        allow update: if isAdmin();
       }
     }
 
@@ -122,16 +161,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Trades
-    match /trades/{tradeId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid ||
-        resource.data.receiverId == request.auth.uid ||
-        isAdmin()
-      );
-      allow delete: if isAdmin();
-    }
+    // Note: the /trades collection has been intentionally removed along
+    // with the peer-trading feature. If it's ever reintroduced, it needs
+    // its own rules again -- Firestore denies access to any path with no
+    // matching rule by default.
   }
 }
