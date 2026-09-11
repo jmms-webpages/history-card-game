@@ -1,7 +1,12 @@
 {
-  "projectId": "history-card-quest-app",
-  "appId": "1:276960982650:web:mock-app-id",
-  "storageBucket": "history-card-quest-app.firebasestorage.app",
-  "apiKey": "mock-api-key",
-  "authDomain": "history-card-quest-app.firebaseapp.com"
+  "projectId": "ace-scarab-507919-e0",
+  "appId": "1:989745180821:web:411577aa2e78d2d831eb9c",
+  "apiKey": "AIzaSyCITMBv3hMaCp0o5ba2BdrzxCbvVb2W7rA",
+  "authDomain": "ace-scarab-507919-e0.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-historycardquest-ffc5fa8b-b172-4c20-84e2-12e3a9331aad",
+  "storageBucket": "ace-scarab-507919-e0.firebasestorage.app",
+  "messagingSenderId": "989745180821",
+  "measurementId": "",
+  "oAuthClientId": "989745180821-t6tectnp2bda5bu5i76qfupaj6632sgi.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

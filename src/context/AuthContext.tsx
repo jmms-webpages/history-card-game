@@ -16,11 +16,6 @@ import {
 import { UserProfile, UserRole } from '../types';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 
-export interface GoogleAccountPayload {
-  email: string;
-  displayName?: string;
-}
-
 interface AuthContextType {
   currentUser: FirebaseUser | null;
   userProfile: UserProfile | null;
@@ -31,10 +26,8 @@ interface AuthContextType {
   isStudentViewMode: boolean;
   setStudentViewMode: (enabled: boolean) => void;
   toggleStudentViewMode: () => void;
-  loginWithGoogle: (account?: GoogleAccountPayload) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
-  isGoogleChooserOpen: boolean;
-  setIsGoogleChooserOpen: (open: boolean) => void;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
@@ -150,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isGoogleChooserOpen, setIsGoogleChooserOpen] = useState<boolean>(false);
 
   const setStudentViewMode = (enabled: boolean) => {
     setIsStudentViewModeState(enabled);
@@ -304,86 +296,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Google Sign-In
-  const loginWithGoogle = async (googleAccount?: GoogleAccountPayload) => {
+  // Google Sign-In with real Google Account Picker
+  const loginWithGoogle = async () => {
     try {
       setError(null);
       setLoading(true);
 
-      // A. If an account payload is passed directly (from Google Account Chooser):
-      if (googleAccount && googleAccount.email) {
-        const email = googleAccount.email.trim().toLowerCase();
-        if (!isAllowedEmailDomain(email)) {
-          setError(
-            `Access Restricted: "${email}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`
-          );
-          return;
-        }
+      if (!auth) {
+        throw new Error('Authentication is not initialized. Please ensure Firebase configuration is valid.');
+      }
 
-        const isAdminUser = isUserAdminEmail(email);
-        const assignedDisplayName = isAdminUser
-          ? 'Teacher & Director (JAF)'
-          : deriveDisplayName(googleAccount.displayName || email, '8th Grade Student');
+      // Explicitly tell Google to show the account chooser so the user selects their real Google profile
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-        const safeKey = email.replace(/[^a-z0-9]/g, '_');
-        const uid = `google_${safeKey}`;
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
 
-        await syncFirestoreProfile(uid, email, assignedDisplayName);
-        setIsGoogleChooserOpen(false);
+      if (!fbUser.email || !isAllowedEmailDomain(fbUser.email)) {
+        await fbSignOut(auth);
+        setCurrentUser(null);
+        saveProfileLocally(null);
+        setError(
+          `Access Restricted: "${fbUser.email ?? 'this account'}" is not an authorized account. Only official Jackson Local Schools Google accounts (@bearworks.jackson.sparcc.org or @jackson.sparcc.org) may sign in.`
+        );
         return;
       }
 
-      // B. If live Firebase popup is configured and active, attempt native Google popup:
-      if (isFirebaseConfigured && auth && googleProvider) {
-        try {
-          const result = await signInWithPopup(auth, googleProvider);
-          const fbUser = result.user;
+      setCurrentUser(fbUser);
+      const isAdminUser = isUserAdminEmail(fbUser.email);
+      const assignedName = isAdminUser
+        ? 'Teacher & Director (JAF)'
+        : deriveDisplayName(fbUser.displayName || fbUser.email, '8th Grade Student');
 
-          if (!fbUser.email || !isAllowedEmailDomain(fbUser.email)) {
-            await fbSignOut(auth);
-            setCurrentUser(null);
-            saveProfileLocally(null);
-            setError(
-              `Access Restricted: "${fbUser.email ?? 'this account'}" is not an authorized account. Only @bearworks.jackson.sparcc.org or @jackson.sparcc.org Google accounts may sign in.`
-            );
-            return;
-          }
-
-          setCurrentUser(fbUser);
-          const isAdminUser = isUserAdminEmail(fbUser.email);
-          const assignedName = isAdminUser
-            ? 'Teacher & Director (JAF)'
-            : deriveDisplayName(fbUser.displayName || fbUser.email, '8th Grade Student');
-
-          await syncFirestoreProfile(fbUser.uid, fbUser.email, assignedName);
-          setIsGoogleChooserOpen(false);
-          return;
-        } catch (popupErr: any) {
-          if (popupErr?.code === 'auth/popup-closed-by-user') {
-            return;
-          }
-          console.warn('Firebase popup sign-in attempt notice:', popupErr);
-          // Fall through to resilient Google Account Chooser without displaying notice
-        }
-      }
-
-      // C. Resilient Google Account Chooser (seamlessly handles static deployments, GitHub Pages, or mock keys)
-      // Never shows an unconfigured error notice.
-      setIsGoogleChooserOpen(true);
+      await syncFirestoreProfile(fbUser.uid, fbUser.email, assignedName);
     } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user') {
+        // User voluntarily closed the Google popup -- do not display an error
+        return;
+      }
+      if (err?.code === 'auth/unauthorized-domain') {
+        console.warn('Firebase unauthorized domain:', window.location.hostname);
+        setError(
+          `Domain "${window.location.hostname}" is not authorized in Firebase. Please add this domain to Firebase Console -> Authentication -> Settings -> Authorized Domains.`
+        );
+        return;
+      }
       console.error('Google sign in error:', err);
-      setError('Unable to complete Google sign-in. Please try again.');
+      setError(err?.message || 'Unable to complete Google sign-in. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Jackson School Email Authentication (backward compatible alias to Google SSO)
+  // Jackson School Email Authentication (backward compatible alias)
   const loginWithSchoolEmail = async (email: string, firstName: string, lastName: string) => {
-    return loginWithGoogle({
-      email,
-      displayName: `${firstName} ${lastName}`.trim()
-    });
+    return loginWithGoogle();
   };
 
   const logout = async () => {
@@ -445,8 +412,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleStudentViewMode,
       loginWithGoogle,
       loginWithSchoolEmail,
-      isGoogleChooserOpen,
-      setIsGoogleChooserOpen,
       logout,
       updateUserProfile,
       updateCoins,
