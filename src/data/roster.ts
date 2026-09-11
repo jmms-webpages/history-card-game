@@ -11,7 +11,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 32,
     questionsAnswered: 35,
     correctAnswers: 32,
-    tradesCompleted: 5,
     lastActive: '10 minutes ago'
   },
   {
@@ -24,7 +23,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 38,
     questionsAnswered: 40,
     correctAnswers: 36,
-    tradesCompleted: 7,
     lastActive: '25 minutes ago'
   },
   {
@@ -37,7 +35,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 27,
     questionsAnswered: 30,
     correctAnswers: 29,
-    tradesCompleted: 3,
     lastActive: '1 hour ago'
   },
   {
@@ -50,7 +47,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 34,
     questionsAnswered: 36,
     correctAnswers: 31,
-    tradesCompleted: 6,
     lastActive: '2 hours ago'
   },
   {
@@ -63,7 +59,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 24,
     questionsAnswered: 28,
     correctAnswers: 26,
-    tradesCompleted: 4,
     lastActive: '3 hours ago'
   },
   {
@@ -76,7 +71,6 @@ export const INITIAL_CLASSROOM_STUDENTS: ClassroomStudent[] = [
     totalCards: 20,
     questionsAnswered: 24,
     correctAnswers: 20,
-    tradesCompleted: 2,
     lastActive: '5 hours ago'
   }
 ];
