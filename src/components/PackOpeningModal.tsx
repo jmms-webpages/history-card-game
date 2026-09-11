@@ -80,7 +80,9 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
                   Booster Pack Opened
                 </span>
-                <span className="text-xs text-slate-400 font-mono">5 Cards</span>
+                <span className="text-xs text-slate-300 font-mono font-semibold bg-slate-950 px-2.5 py-0.5 rounded-full border border-slate-800">
+                  5 Cards Pulled • Pool: {pack.cardCount} Cards
+                </span>
               </div>
               <h2 className="text-lg sm:text-xl font-black font-serif text-slate-100">
                 {pack.name}

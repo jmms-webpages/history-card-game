@@ -25,6 +25,7 @@ interface CardsContextType {
   getCardById: (cardId: string) => Card | undefined;
   isCardOwned: (cardId: string) => boolean;
   getCardCopies: (cardId: string) => number;
+  getPackCardPool: (pack: Pack) => Card[];
   stats: {
     totalCards: number;
     uniqueCards: number;
@@ -64,7 +65,35 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_CARDS;
   });
 
-  const [packs] = useState<Pack[]>(INITIAL_PACKS);
+  // The set of cards that actually belong to a given pack. A card belongs
+  // to a pack if its packTheme matches the pack's theme, or (as a fallback
+  // link) its unitId matches the unit a "pack-unit-N" pack represents.
+  const getPackCardPoolInternal = (pack: Pack, activeCards: Card[]): Card[] => {
+    return activeCards.filter(c =>
+      c.packTheme === pack.theme ||
+      (pack.packId.startsWith('pack-unit-') && c.unitId === pack.packId.replace('pack-', ''))
+    );
+  };
+
+  const getPackCardPool = (pack: Pack): Card[] => {
+    const activeCards = cards.filter(c => c.active);
+    const pool = getPackCardPoolInternal(pack, activeCards);
+    return pool.length > 0 ? pool : activeCards;
+  };
+
+  // Dynamically compute packs with real-time possible card counts based on active cards
+  const packs = useMemo<Pack[]>(() => {
+    const activeCards = cards.filter(c => c.active);
+    return INITIAL_PACKS.map(pack => {
+      const pool = getPackCardPoolInternal(pack, activeCards);
+      const totalPossible = pool.length > 0 ? pool.length : activeCards.length;
+      return {
+        ...pack,
+        cardCount: totalPossible
+      };
+    });
+  }, [cards]);
+
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
 
@@ -198,16 +227,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // available rarity WITHOUT ever leaving the pack's own card pool.
   const RARITY_ORDER: CardRarity[] = ['Mythical', 'Legendary', 'Rare', 'Uncommon', 'Common'];
 
-  // The set of cards that actually belong to a given pack. A card belongs
-  // to a pack if its packTheme matches the pack's theme, or (as a fallback
-  // link) its unitId matches the unit a "pack-unit-N" pack represents.
-  const getPackCardPool = (pack: Pack, activeCards: Card[]): Card[] => {
-    return activeCards.filter(c =>
-      c.packTheme === pack.theme ||
-      (pack.packId.startsWith('pack-unit-') && c.unitId === pack.packId.replace('pack-', ''))
-    );
-  };
-
   // Draw 1 card for this pack. Cards are ALWAYS drawn from the pack's own
   // pool -- a pack can never hand out a card from a different pack/theme.
   // If the pack itself has no linked cards at all (e.g. a curated
@@ -215,7 +234,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // since that pack has no card pool of its own by design.
   const drawCard = (rarity: CardRarity, pack: Pack): Card => {
     const activeCards = cards.filter(c => c.active);
-    const packPool = getPackCardPool(pack, activeCards);
+    const packPool = getPackCardPoolInternal(pack, activeCards);
     const scopedPool = packPool.length > 0 ? packPool : activeCards;
 
     // 1. Try the exact rolled rarity within this pack's own cards.
@@ -496,6 +515,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       getCardById,
       isCardOwned,
       getCardCopies,
+      getPackCardPool,
       stats,
       addCustomCard,
       toggleCardActive
