@@ -7,7 +7,6 @@ import {
   HelpCircle, 
   Package, 
   Library, 
-  Repeat, 
   User, 
   GraduationCap, 
   LogOut, 
@@ -47,7 +46,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
     { id: 'questions', label: 'Trivia', icon: <HelpCircle className="w-3.5 h-3.5" /> },
     { id: 'packs', label: 'Packs', icon: <Package className="w-3.5 h-3.5" /> },
     { id: 'collection', label: 'Binder', icon: <Library className="w-3.5 h-3.5" /> },
-    { id: 'trading', label: 'Trading', icon: <Repeat className="w-3.5 h-3.5" /> },
     { id: 'leaderboard', label: 'Honor Roll', icon: <Trophy className="w-3.5 h-3.5" /> }
   ];
 

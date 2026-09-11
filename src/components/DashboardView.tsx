@@ -12,7 +12,6 @@ import {
   HelpCircle, 
   Package, 
   Library, 
-  Repeat, 
   CheckCircle2, 
   Flame, 
   BookOpen, 
@@ -171,7 +170,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* Quick Action Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Action: Questions */}
         <div 
@@ -233,27 +232,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Track cards, view historical significance, complete sets, and sell duplicates.
-          </p>
-        </div>
-
-        {/* Action: Trading */}
-        <div 
-          onClick={() => onNavigate('trading')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-slate-950 transition-colors">
-            <Repeat className="w-5 h-5" />
-          </div>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-              Student Trading
-            </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Live
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Exchange duplicate cards safely with classmates using secure atomic transactions.
           </p>
         </div>
 
