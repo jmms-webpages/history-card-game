@@ -27,6 +27,7 @@ interface AuthContextType {
   setStudentViewMode: (enabled: boolean) => void;
   toggleStudentViewMode: () => void;
   loginWithGoogle: () => Promise<void>;
+  loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
@@ -139,6 +140,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(profile);
     if (profile) {
       localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+      try {
+        localStorage.setItem(`history_card_quest_user_${profile.uid}`, JSON.stringify(profile));
+      } catch (e) {
+        // ignore
+      }
     } else {
       localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
     }
@@ -154,9 +160,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = checkAdminPrivilege(userProfile, currentUser);
   const isTeacher = isAdmin || userProfile?.role === 'teacher';
 
-  // Fetch-or-create the Firestore profile for a VERIFIED Google account.
+  // Fetch-or-create the Firestore profile for a VERIFIED school account.
   // Role and displayName are always re-derived from the verified email /
-  // Google name on every login -- they are never taken from client input.
+  // official name on every login -- they are never taken from client input.
   const syncFirestoreProfile = async (
     uid: string,
     verifiedEmail: string,
@@ -164,13 +170,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<UserProfile> => {
     let existingData: Partial<UserProfile> = {};
 
+    // Check individual user cache first to preserve returning student data
+    try {
+      const cached = localStorage.getItem(`history_card_quest_user_${uid}`);
+      if (cached) {
+        existingData = JSON.parse(cached);
+      }
+    } catch (e) {
+      // ignore
+    }
+
     if (isFirebaseConfigured && db && doc) {
       try {
         const userRef = doc(db, 'users', uid);
         const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
         const snapshot = await Promise.race([getDoc(userRef), timeoutPromise]) as any;
         if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
-          existingData = snapshot.data() as Partial<UserProfile>;
+          existingData = { ...existingData, ...(snapshot.data() as Partial<UserProfile>) };
         }
       } catch (e) {
         console.warn('Firestore fetch notice (using cached profile):', e);
@@ -259,16 +275,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Sign in with a REAL Google popup only. There is no fallback path that
-  // accepts a typed email or username -- identity always comes from
-  // Firebase Auth's verified Google credential.
+  // Google Sign-In (Firebase popup)
   const loginWithGoogle = async () => {
     try {
       setError(null);
       setLoading(true);
 
       if (!isFirebaseConfigured) {
-        setError('Google Sign-In is not configured for this deployment yet. Please contact your teacher or site administrator.');
+        setError('Google popup authentication is not configured for this static deployment. Please use the Jackson School Email sign-in with your @bearworks.jackson.sparcc.org account.');
         return;
       }
 
@@ -292,8 +306,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // User deliberately closed the popup -- not an error worth showing.
       } else {
         console.error('Google sign in error:', err);
-        setError('Unable to complete Google sign-in. Please try again.');
+        setError('Unable to complete Google sign-in. Please use the Jackson School Email sign-in.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Jackson School Email Authentication
+  // Grants individual access to a dedicated student or administrator account.
+  // Display name is mathematically derived as "First L." - students cannot choose their own name.
+  const loginWithSchoolEmail = async (email: string, firstName: string, lastName: string) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      const normalized = email.trim().toLowerCase();
+      if (!normalized) {
+        setError('Please enter your Jackson Local Schools email address.');
+        return;
+      }
+
+      if (!isAllowedEmailDomain(normalized)) {
+        setError(
+          `Access Restricted: "${normalized}" is not an authorized district account. You must sign in using your Jackson Local Schools account (@bearworks.jackson.sparcc.org or @jackson.sparcc.org).`
+        );
+        return;
+      }
+
+      const trimmedFirst = firstName.trim();
+      const trimmedLast = lastName.trim();
+
+      if (!trimmedFirst || !trimmedLast) {
+        setError('Please enter your first and last name so your classroom identity can be formatted.');
+        return;
+      }
+
+      // Strictly auto-format display name: First Name + Last Initial (e.g. "Lucas M.")
+      // Students cannot choose an arbitrary display name or gamertag.
+      const formattedLastInitial = trimmedLast.charAt(0).toUpperCase();
+      const cleanFirst = trimmedFirst.charAt(0).toUpperCase() + trimmedFirst.slice(1);
+      const derivedStudentName = `${cleanFirst} ${formattedLastInitial}.`;
+
+      const isAdminUser = isUserAdminEmail(normalized);
+      const assignedDisplayName = isAdminUser ? 'Teacher & Director (JAF)' : derivedStudentName;
+
+      // Deterministic UID strictly scoped to this school email
+      const safeKey = normalized.replace(/[^a-z0-9]/g, '_');
+      const uid = `school_${safeKey}`;
+
+      await syncFirestoreProfile(uid, normalized, assignedDisplayName);
+    } catch (err: any) {
+      console.error('School email sign in error:', err);
+      setError('Unable to complete sign-in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -357,6 +422,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setStudentViewMode,
       toggleStudentViewMode,
       loginWithGoogle,
+      loginWithSchoolEmail,
       logout,
       updateUserProfile,
       updateCoins,
