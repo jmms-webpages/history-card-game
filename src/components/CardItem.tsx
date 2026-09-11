@@ -49,30 +49,37 @@ export const CardItem: React.FC<CardItemProps> = ({
     );
   }
 
-  // Unowned / Locked Card Silhouette in Binder
+  // Unowned / Locked Card Slot in Binder (No preview, strictly locked)
   if (!isOwned) {
     return (
       <div
         onClick={onClick}
-        className="relative aspect-[5/7] rounded-2xl bg-slate-950/80 border border-slate-800/80 p-3.5 flex flex-col justify-between cursor-pointer hover:border-slate-700 transition-all opacity-60 hover:opacity-80 select-none"
+        className="relative aspect-[5/7] rounded-2xl bg-slate-950/90 border border-slate-800/80 p-3.5 flex flex-col justify-between items-center text-center select-none group transition-all duration-200 hover:border-slate-700/90 cursor-pointer"
+        title="Locked card - Open booster packs to reveal"
       >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono text-slate-500">{card.standardId}</span>
-          <Lock className="w-3.5 h-3.5 text-slate-600" />
+        <div className="w-full flex items-center justify-between text-slate-600">
+          <span className="text-[10px] font-mono tracking-wider font-semibold uppercase text-slate-500">
+            Locked
+          </span>
+          <Lock className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400/80 transition-colors" />
         </div>
 
-        <div className="text-center py-4 space-y-1">
-          <div className="w-10 h-10 rounded-full bg-slate-900/90 border border-slate-800 flex items-center justify-center mx-auto text-slate-600 text-lg">
-            ?
+        <div className="py-4 space-y-2 flex flex-col items-center">
+          <div className="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-500 shadow-inner group-hover:scale-105 group-hover:text-amber-400 group-hover:border-amber-500/30 transition-all">
+            <Lock className="w-5 h-5" />
           </div>
-          <p className="text-xs font-bold text-slate-400 line-clamp-1">{card.name}</p>
-          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block ${colors.badge}`}>
-            {card.rarity}
+          <p className="text-xs font-mono font-bold text-slate-500 tracking-widest">
+            ???
+          </p>
+          <span className="text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-slate-900/90 text-slate-400 border border-slate-800">
+            Locked Card
           </span>
         </div>
 
-        <div className="text-center border-t border-slate-900 pt-2">
-          <span className="text-[9px] text-slate-600 font-mono">Undiscovered</span>
+        <div className="w-full text-center border-t border-slate-900 pt-2">
+          <span className="text-[9px] text-slate-500 font-mono">
+            Open packs to reveal
+          </span>
         </div>
       </div>
     );

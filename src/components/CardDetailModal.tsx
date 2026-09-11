@@ -34,7 +34,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
   const [selling, setSelling] = useState(false);
   const [sellMessage, setSellMessage] = useState<string | null>(null);
 
-  if (!card) return null;
+  if (!card || !isOwned) return null;
 
   const colors = RARITY_COLORS[card.rarity] || RARITY_COLORS.Common;
   const isHighTier = ['Rare', 'Legendary', 'Mythical'].includes(card.rarity);

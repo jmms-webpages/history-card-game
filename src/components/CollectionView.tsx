@@ -334,7 +334,10 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
                 card={card}
                 isOwned={owned}
                 copiesCount={copies}
-                onClick={() => setSelectedCard(card)}
+                onClick={owned ? () => setSelectedCard(card) : () => {
+                  setToastMessage("This card slot is locked! Open booster packs to reveal and discover it.");
+                  setTimeout(() => setToastMessage(null), 3500);
+                }}
               />
             );
           })}
