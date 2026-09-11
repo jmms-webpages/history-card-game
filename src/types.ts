@@ -123,11 +123,11 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  category: 'trivia' | 'collection' | 'trading' | 'general';
+  category: 'trivia' | 'collection' | 'general';
   icon: string;
   coinReward: number;
   requirement: {
-    type: 'questions_answered' | 'correct_questions' | 'unique_cards' | 'total_cards' | 'unit_cards' | 'trades_completed' | 'mythical_pulled';
+    type: 'questions_answered' | 'correct_questions' | 'unique_cards' | 'total_cards' | 'unit_cards' | 'mythical_pulled';
     target: number;
     unitId?: string;
   };
@@ -143,7 +143,6 @@ export interface ClassroomStudent {
   totalCards: number;
   questionsAnswered: number;
   correctAnswers: number;
-  tradesCompleted: number;
   lastActive: string;
 }
 
@@ -152,10 +151,8 @@ export type NavigationTab =
   | 'questions'
   | 'packs'
   | 'collection'
-  | 'trading'
   | 'leaderboard'
   | 'profile'
   | 'teacher'
   | 'admin'
   | 'student-view';
-
