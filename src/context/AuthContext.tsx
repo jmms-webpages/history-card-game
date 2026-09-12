@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   auth,
   googleProvider,
@@ -28,7 +28,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected'>>) => Promise<void>;
+  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
 }
@@ -158,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const saveProfileLocally = (profile: UserProfile | null) => {
     setUserProfile(profile);
+    userProfileRef.current = profile;
     if (profile) {
       localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
       try {
@@ -168,6 +169,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
     }
+  };
+
+  // Mirrors the latest profile synchronously (unlike React state, which only
+  // updates on next render). Prevents back-to-back calls like
+  // updateUserProfile() immediately followed by updateCoins() from each
+  // building off a stale snapshot and clobbering each other's changes --
+  // which is what let achievements be claimed for coins repeatedly.
+  const userProfileRef = useRef<UserProfile | null>(userProfile);
+
+  // Applies an update on top of whatever the most recent value actually is,
+  // updates the ref immediately, and returns the resulting profile so the
+  // caller can use it right away without waiting for a re-render.
+  const applyProfileUpdate = (updates: Partial<UserProfile>): UserProfile | null => {
+    const base = userProfileRef.current;
+    if (!base) return null;
+    const updated: UserProfile = { ...base, ...updates };
+    saveProfileLocally(updated);
+    return updated;
   };
 
   // Mirrors only the safe, public fields of a profile into /leaderboard/{uid}
@@ -379,14 +398,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Only avatar & classroomCode are user-editable. displayName, email, and
   // role are intentionally NOT accepted here -- see also firestore.rules,
   // which independently blocks any client attempt to write those fields.
-  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected'>>) => {
-    if (!userProfile) return;
-    const updated: UserProfile = { ...userProfile, ...updates };
-    saveProfileLocally(updated);
+  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => {
+    const updated = applyProfileUpdate(updates);
+    if (!updated) return;
 
     try {
-      if (isFirebaseConfigured && db && doc && userProfile.uid) {
-        const userRef = doc(db, 'users', userProfile.uid);
+      if (isFirebaseConfigured && db && doc && updated.uid) {
+        const userRef = doc(db, 'users', updated.uid);
         await updateDoc(userRef, updates);
       }
     } catch (e) {
@@ -396,14 +414,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateCoins = async (deltaCoins: number): Promise<number> => {
-    if (!userProfile) return 0;
-    const newCoins = Math.max(0, (userProfile.coins || 0) + deltaCoins);
-    const updated: UserProfile = { ...userProfile, coins: newCoins };
-    saveProfileLocally(updated);
+    const base = userProfileRef.current;
+    if (!base) return 0;
+    const newCoins = Math.max(0, (base.coins || 0) + deltaCoins);
+    const updated = applyProfileUpdate({ coins: newCoins });
+    if (!updated) return 0;
 
     try {
-      if (isFirebaseConfigured && db && doc && userProfile.uid) {
-        const userRef = doc(db, 'users', userProfile.uid);
+      if (isFirebaseConfigured && db && doc && updated.uid) {
+        const userRef = doc(db, 'users', updated.uid);
         await updateDoc(userRef, { coins: newCoins });
       }
     } catch (e) {
