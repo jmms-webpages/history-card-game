@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
-import { NavigationTab, Question } from '../types';
+import { NavigationTab, Question, UserProfile } from '../types';
+import { isFirebaseConfigured, db, collection, getDocs, query, where } from '../firebase/config';
 import { 
   ShieldCheck, 
   Settings, 
@@ -23,7 +24,8 @@ import {
   Award,
   Sparkles,
   Layers,
-  Search
+  Search,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -43,10 +45,46 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
   const {
     cards,
-    toggleCardActive
+    packs,
+    toggleCardActive,
+    togglePackActive
   } = useCards();
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'questions' | 'cards' | 'economy' | 'units' | 'standards'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'students' | 'questions' | 'cards' | 'packs' | 'economy' | 'units' | 'standards'>('overview');
+
+  // Real classroom roster, pulled live from Firestore -- every account
+  // that has ever signed in shows up here, not a hardcoded sample list.
+  const [students, setStudents] = useState<UserProfile[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
+  const [studentSearch, setStudentSearch] = useState<string>('');
+
+  const fetchStudents = async () => {
+    if (!isFirebaseConfigured || !db || !collection || !getDocs || !query || !where) return;
+    setLoadingStudents(true);
+    try {
+      const usersColl = collection(db, 'users');
+      const studentQuery = query(usersColl, where('role', '==', 'student'));
+      const snap = await getDocs(studentQuery);
+      const list: UserProfile[] = snap.docs.map((d: any) => d.data() as UserProfile);
+      list.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      setStudents(list);
+    } catch (e) {
+      console.warn('Student roster fetch notice:', e);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) fetchStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  const filteredStudents = students.filter(s => {
+    if (!studentSearch.trim()) return true;
+    const term = studentSearch.toLowerCase();
+    return s.displayName.toLowerCase().includes(term) || (s.email || '').toLowerCase().includes(term);
+  });
 
   // Economy state
   const [dailyLimit, setDailyLimit] = useState(gameSettings.dailyQuestionLimit);
@@ -174,21 +212,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             </div>
           </div>
 
-          {/* Action Links: Open Teacher Dashboard or Launch Student View */}
+          {/* Action Links: Launch Student View */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {onNavigate && (
-              <button
-                id="admin-to-teacher-portal-button"
-                type="button"
-                onClick={() => onNavigate('teacher')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm"
-                title="Switch to classroom teacher tools & roster"
-              >
-                <GraduationCap className="w-4 h-4 text-amber-400" />
-                <span>Teacher Dashboard</span>
-              </button>
-            )}
-
             <button
               id="admin-launch-student-view-button"
               type="button"
@@ -223,6 +248,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             System Overview
           </button>
           <button
+            id="admin-subtab-students"
+            type="button"
+            onClick={() => setActiveSubTab('students')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'students' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Students ({students.length})</span>
+          </button>
+          <button
             id="admin-subtab-questions"
             type="button"
             onClick={() => setActiveSubTab('questions')}
@@ -243,6 +279,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           >
             <Package className="w-3.5 h-3.5" />
             <span>Card Catalog & Rarity ({cards.length})</span>
+          </button>
+          <button
+            id="admin-subtab-packs"
+            type="button"
+            onClick={() => setActiveSubTab('packs')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'packs' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>Pack Availability</span>
           </button>
           <button
             id="admin-subtab-economy"
@@ -279,6 +326,74 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           </button>
         </div>
       </div>
+
+      {/* Students Roster Tab */}
+      {activeSubTab === 'students' && (
+        <div className="space-y-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
+            <div className="flex items-center gap-2 flex-1 w-full sm:max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Search students..."
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-xs text-slate-400 font-mono">{filteredStudents.length} of {students.length} students</span>
+              <button
+                type="button"
+                onClick={fetchStudents}
+                disabled={loadingStudents}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingStudents ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Student</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4 text-center">Unique Cards</th>
+                    <th className="py-3 px-4 text-center">Total Cards</th>
+                    <th className="py-3 px-4 text-right">Coins</th>
+                    <th className="py-3 px-4 text-right">Last Active</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredStudents.map(s => (
+                    <tr key={s.uid} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-4 font-bold text-slate-100">{s.displayName}</td>
+                      <td className="py-3 px-4 text-slate-400 font-mono">{s.email}</td>
+                      <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{s.uniqueCardsCollected ?? 0}</td>
+                      <td className="py-3 px-4 text-center font-mono text-slate-300">{s.totalCardsCollected ?? 0}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-300">{s.coins ?? 0}</td>
+                      <td className="py-3 px-4 text-right text-slate-500 font-mono">
+                        {s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {!loadingStudents && filteredStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                        No students found yet — they'll appear here after their first sign-in.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Overview Tab */}
       {activeSubTab === 'overview' && (
@@ -665,6 +780,43 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Pack Availability Tab */}
+      {activeSubTab === 'packs' && (
+        <div className="space-y-3 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow">
+            <h3 className="font-bold text-slate-100 text-base">Curriculum Pack Availability</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Lock a unit's booster pack until your class actually reaches that unit. Locked packs can't be opened by students, even if they have the coins.
+            </p>
+          </div>
+          {packs.map(pack => (
+            <div
+              key={pack.packId}
+              className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+                pack.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-70'
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-bold text-slate-100 font-serif">{pack.name}</h4>
+                <p className="text-xs text-slate-400 mt-0.5">{pack.theme} &middot; {pack.cardCount} possible cards</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => togglePackActive(pack.packId)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border shrink-0 ${
+                  pack.active
+                    ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {pack.active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
+                <span>{pack.active ? 'Open to Students' : 'Locked'}</span>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

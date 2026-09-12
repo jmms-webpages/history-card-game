@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
-import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -17,16 +16,13 @@ import {
   Check, 
   AlertCircle,
   HelpCircle,
-  Trophy,
-  Compass
+  Trophy
 } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
   const { userProfile, isAdmin } = useAuth();
   const {
     currentQuestion,
-    selectedUnitId,
-    setSelectedUnitId,
     dailyActivity,
     gameSettings,
     soundEnabled,
@@ -161,38 +157,19 @@ export const QuestionsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Unit Filter Selector */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-400 flex items-center gap-1">
-            <Compass className="w-3.5 h-3.5 text-amber-400" />
-            Curriculum Unit:
-          </span>
-          <select
-            value={selectedUnitId}
-            onChange={(e) => setSelectedUnitId(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400 cursor-pointer"
-          >
-            <option value="all">All Units (Daily Curriculum Mix)</option>
-            {INITIAL_UNITS.map(unit => (
-              <option key={unit.unitId} value={unit.unitId}>
-                {unit.unitName}
-              </option>
-            ))}
-          </select>
-
-          {/* Admin Reset Button for Testing */}
-          {isAdmin && (
+        {isAdmin && (
+          <div className="mt-4 flex items-center justify-end">
             <button
               type="button"
               onClick={resetDailyActivity}
-              className="ml-auto text-[11px] text-slate-500 hover:text-amber-400 flex items-center gap-1 transition-colors cursor-pointer"
+              className="text-[11px] text-slate-500 hover:text-amber-400 flex items-center gap-1 transition-colors cursor-pointer"
               title="Reset today's question count (Master Admin)"
             >
               <RotateCcw className="w-3 h-3" />
               Reset Daily Count
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Daily Cap Banner when limit reached */}
@@ -365,17 +342,10 @@ export const QuestionsView: React.FC = () => {
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
           <HelpCircle className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-200">No questions found in this category</h3>
+          <h3 className="text-base font-bold text-slate-200">No trivia questions are active right now</h3>
           <p className="text-xs text-slate-400 mt-1">
-            Try switching your Unit filter to "All Units" above.
+            Ask your teacher to activate questions in the Admin Console.
           </p>
-          <button
-            type="button"
-            onClick={() => setSelectedUnitId('all')}
-            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl"
-          >
-            Show All Units
-          </button>
         </div>
       )}
 

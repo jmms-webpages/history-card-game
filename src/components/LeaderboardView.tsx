@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
-import { useQuestions } from '../context/QuestionsContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
-import { INITIAL_CLASSROOM_STUDENTS } from '../data/roster';
 import { getAvatarById } from '../data/avatars';
-import { Achievement, ClassroomStudent, Card } from '../types';
+import { isFirebaseConfigured, db, collection, getDocs } from '../firebase/config';
+import { Achievement } from '../types';
 import { sounds } from '../utils/audio';
 import { 
   Trophy, 
@@ -16,73 +15,103 @@ import {
   Sparkles, 
   CheckCircle2, 
   Lock, 
-  Flame, 
   Crown,
-  ChevronRight,
-  HelpCircle,
-  ExternalLink,
-  Search,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
+
+interface LeaderboardEntry {
+  uid: string;
+  displayName: string;
+  avatar: string;
+  classroomCode: string;
+  coins: number;
+  uniqueCards: number;
+  totalCards: number;
+}
 
 interface LeaderboardViewProps {
   onNavigateTab?: (tab: any) => void;
 }
 
+const MAX_LEADERBOARD_ROWS = 25;
+
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
   const { inventoryCards, stats } = useCards();
-  const { dailyActivity } = useQuestions();
 
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'achievements'>('leaderboard');
-  const [rankingMetric, setRankingMetric] = useState<'cards' | 'trivia'>('cards');
   const [achievementCategory, setAchievementCategory] = useState<string>('all');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [justClaimedReward, setJustClaimedReward] = useState<{ id: string; reward: number } | null>(null);
 
-  // Student stats for current user
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loadingEntries, setLoadingEntries] = useState<boolean>(true);
 
-  const currentUserStudent: ClassroomStudent = useMemo(() => {
-    return {
-      uid: userProfile?.uid || 'current-user',
-      displayName: userProfile?.displayName || 'You',
-      avatar: userProfile?.avatar || 'pioneer',
-      classroomCode: userProfile?.classroomCode || 'JMMS-8TH-2026',
-      coins: userProfile?.coins || 0,
-      uniqueCards: stats.uniqueCards,
-      totalCards: inventoryCards.length,
-      questionsAnswered: dailyActivity?.questionsAnswered || 0,
-      correctAnswers: dailyActivity?.correctAnswers || 0,
-      lastActive: 'Just now'
-    };
-  }, [userProfile, stats.uniqueCards, inventoryCards.length, dailyActivity]);
+  const fetchLeaderboard = async () => {
+    if (!isFirebaseConfigured || !db || !collection || !getDocs) {
+      setLoadingEntries(false);
+      return;
+    }
+    setLoadingEntries(true);
+    try {
+      const coll = collection(db, 'leaderboard');
+      const snap = await getDocs(coll);
+      const list: LeaderboardEntry[] = snap.docs.map((d: any) => {
+        const data = d.data();
+        return {
+          uid: data.uid,
+          displayName: data.displayName,
+          avatar: data.avatar,
+          classroomCode: data.classroomCode,
+          coins: data.coins ?? 0,
+          uniqueCards: data.uniqueCardsCollected ?? 0,
+          totalCards: data.totalCardsCollected ?? 0
+        };
+      });
+      setEntries(list);
+    } catch (e) {
+      console.warn('Leaderboard fetch notice:', e);
+    } finally {
+      setLoadingEntries(false);
+    }
+  };
 
-  // Combined sorted roster
+  useEffect(() => {
+    fetchLeaderboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Honor Roll ranks by card binder completion only -- never trivia
+  // accuracy -- so students who are still building confidence with the
+  // questions never get singled out or compared on that axis.
+  const currentUserEntry: LeaderboardEntry = useMemo(() => ({
+    uid: userProfile?.uid || 'current-user',
+    displayName: userProfile?.displayName || 'You',
+    avatar: userProfile?.avatar || 'pioneer',
+    classroomCode: userProfile?.classroomCode || 'JMMS-8TH-2026',
+    coins: userProfile?.coins || 0,
+    uniqueCards: stats.uniqueCards,
+    totalCards: inventoryCards.length
+  }), [userProfile, stats.uniqueCards, inventoryCards.length]);
+
   const sortedStudents = useMemo(() => {
-    // Combine roster with current user if not already in roster
-    const rosterList = [...INITIAL_CLASSROOM_STUDENTS];
-    const existingIdx = rosterList.findIndex(s => s.uid === currentUserStudent.uid);
+    const list = [...entries];
+    const existingIdx = list.findIndex(s => s.uid === currentUserEntry.uid);
     if (existingIdx >= 0) {
-      rosterList[existingIdx] = currentUserStudent;
+      list[existingIdx] = currentUserEntry;
     } else {
-      rosterList.push(currentUserStudent);
+      list.push(currentUserEntry);
     }
 
-    return rosterList.sort((a, b) => {
-      if (rankingMetric === 'cards') {
-        if (b.uniqueCards !== a.uniqueCards) return b.uniqueCards - a.uniqueCards;
-        return b.totalCards - a.totalCards;
-      }
-      if (rankingMetric === 'trivia') {
-        if (b.correctAnswers !== a.correctAnswers) return b.correctAnswers - a.correctAnswers;
-        return (b.questionsAnswered > 0 ? b.correctAnswers / b.questionsAnswered : 0) -
-               (a.questionsAnswered > 0 ? a.correctAnswers / a.questionsAnswered : 0);
-      }
-      return 0;
+    list.sort((a, b) => {
+      if (b.uniqueCards !== a.uniqueCards) return b.uniqueCards - a.uniqueCards;
+      return b.totalCards - a.totalCards;
     });
-  }, [currentUserStudent, rankingMetric]);
 
-  // Check progress and unlocked status for each achievement
+    return list.slice(0, MAX_LEADERBOARD_ROWS);
+  }, [entries, currentUserEntry]);
+
   const userClaimedList = userProfile?.claimedAchievements || [];
 
   const checkAchievementProgress = (ach: Achievement): { current: number; max: number; isCompleted: boolean; isClaimed: boolean } => {
@@ -92,10 +121,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
     switch (ach.requirement.type) {
       case 'questions_answered':
-        current = dailyActivity?.questionsAnswered || 0;
+        current = 0;
         break;
       case 'correct_questions':
-        current = dailyActivity?.correctAnswers || 0;
+        current = 0;
         break;
       case 'unique_cards':
         current = stats.uniqueCards;
@@ -137,7 +166,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
     sounds.playAchievement();
 
     const updatedClaimed = [...userClaimedList, ach.id];
-    await updateUserProfile({ claimedAchievements: updatedClaimed });
+    await updateUserProfile({ claimedAchievements: updatedClaimed } as any);
     await updateCoins(ach.coinReward);
 
     setJustClaimedReward({ id: ach.id, reward: ach.coinReward });
@@ -149,7 +178,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const completedAchievementsCount = useMemo(() => {
     return HISTORICAL_ACHIEVEMENTS.filter(a => checkAchievementProgress(a).isCompleted).length;
-  }, [userClaimedList, stats.uniqueCards, inventoryCards, dailyActivity]);
+  }, [userClaimedList, stats.uniqueCards, inventoryCards]);
 
   const filteredAchievements = useMemo(() => {
     if (achievementCategory === 'all') return HISTORICAL_ACHIEVEMENTS;
@@ -179,7 +208,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
               Rankings & Historical Milestones
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
-              Track classroom standing across trivia accuracy and card collecting. Unlock historical achievements to earn bonus coin grants!
+              Ranked by card binder completion — top {MAX_LEADERBOARD_ROWS} scholars. Unlock historical achievements to earn bonus coin grants!
             </p>
           </div>
 
@@ -198,7 +227,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
           </div>
         </div>
 
-        {/* View Switcher Tabs */}
         <div className="flex gap-2 mt-6 pt-5 border-t border-slate-800/80">
           <button
             type="button"
@@ -231,45 +259,27 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
       {/* TAB 1: LEADERBOARD */}
       {activeTab === 'leaderboard' && (
         <div className="space-y-6">
-          {/* Metric Selector Filter */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-              <span>Sort Rankings By:</span>
+          <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>Ranked by Card Binder Completion</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setRankingMetric('cards')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  rankingMetric === 'cards'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Card Binder Completion</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRankingMetric('trivia')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  rankingMetric === 'trivia'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Trivia Accuracy</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={fetchLeaderboard}
+              disabled={loadingEntries}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingEntries ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
           </div>
 
           {/* Top 3 Podium Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             {sortedStudents.slice(0, 3).map((student, idx) => {
               const avatar = getAvatarById(student.avatar);
-              const isCurrentUser = student.uid === currentUserStudent.uid;
+              const isCurrentUser = student.uid === currentUserEntry.uid;
               const placeStyles = [
                 {
                   rank: 1,
@@ -322,14 +332,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                   </div>
                   <p className="text-[11px] text-slate-400 mb-3">{avatar.name} Persona</p>
 
-                  <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3 grid grid-cols-2 gap-1 text-center">
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-mono">Cards</div>
-                      <div className="text-xs font-black font-mono text-amber-300">{student.uniqueCards}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-mono">Trivia</div>
-                      <div className="text-xs font-black font-mono text-indigo-300">{student.correctAnswers}</div>
+                  <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3 text-center">
+                    <div className="text-[10px] text-slate-500 uppercase font-mono">Cards Collected</div>
+                    <div className="text-sm font-black font-mono text-amber-300">
+                      {student.uniqueCards} <span className="text-slate-500 font-normal text-xs">/ {stats.totalInSet}</span>
                     </div>
                   </div>
                 </div>
@@ -337,12 +343,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
             })}
           </div>
 
-          {/* Full Classroom Rankings Table */}
+          {/* Full Rankings Table (top 25) */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Medal className="w-4 h-4 text-amber-400" />
-                <span>Classroom Roster Rankings ({sortedStudents.length} Scholars)</span>
+                <span>Top {sortedStudents.length} Scholars</span>
               </h2>
               <span className="text-xs text-slate-500 font-mono">
                 {userProfile?.classroomCode}
@@ -356,17 +362,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                     <th className="py-3 px-4 w-12 text-center">Rank</th>
                     <th className="py-3 px-4">Student & Persona</th>
                     <th className="py-3 px-4 text-center">Binder Progress</th>
-                    <th className="py-3 px-4 text-center">Trivia Accuracy</th>
                     <th className="py-3 px-4 text-right">Coins</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {sortedStudents.map((student, index) => {
                     const avatar = getAvatarById(student.avatar);
-                    const isCurrentUser = student.uid === currentUserStudent.uid;
-                    const binderPercent = Math.min(100, Math.round((student.uniqueCards / stats.totalInSet) * 100));
-                    const accuracyPercent = student.questionsAnswered > 0
-                      ? Math.round((student.correctAnswers / student.questionsAnswered) * 100)
+                    const isCurrentUser = student.uid === currentUserEntry.uid;
+                    const binderPercent = stats.totalInSet > 0
+                      ? Math.min(100, Math.round((student.uniqueCards / stats.totalInSet) * 100))
                       : 0;
 
                     return (
@@ -415,12 +419,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                           </div>
                         </td>
 
-                        <td className="py-3 px-4 text-center">
-                          <span className="font-mono font-bold text-indigo-300">
-                            {student.correctAnswers} <span className="text-slate-500 font-normal">({accuracyPercent}%)</span>
-                          </span>
-                        </td>
-
                         <td className="py-3 px-4 text-right">
                           <span className="inline-flex items-center gap-1 font-mono font-bold text-amber-300">
                             <Coins className="w-3.5 h-3.5" />
@@ -430,6 +428,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                       </tr>
                     );
                   })}
+                  {!loadingEntries && sortedStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-500">
+                        No rankings yet — open a pack to get on the board!
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -440,7 +445,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
       {/* TAB 2: ACHIEVEMENTS & BADGES */}
       {activeTab === 'achievements' && (
         <div className="space-y-6">
-          {/* Category Filter */}
           <div className="flex flex-wrap items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
             <span className="text-xs text-slate-400 mr-2 flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5" /> Filter Category:
@@ -466,7 +470,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
             ))}
           </div>
 
-          {/* Achievements Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredAchievements.map((ach) => {
               const progress = checkAchievementProgress(ach);
@@ -486,7 +489,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    {/* Badge Icon */}
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 shadow ${
                       progress.isCompleted
                         ? 'bg-amber-500/20 border border-amber-500/40'
@@ -495,7 +497,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                       {ach.icon}
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <h3 className="font-bold text-sm text-slate-100 truncate">
@@ -511,7 +512,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                         {ach.description}
                       </p>
 
-                      {/* Progress Bar & Status */}
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-[11px] font-mono">
                           <span className="text-slate-400">
@@ -532,7 +532,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                         </div>
                       </div>
 
-                      {/* Claim Button / Status Badge */}
                       <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
                         {progress.isClaimed ? (
                           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-bold">

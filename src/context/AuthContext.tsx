@@ -22,14 +22,13 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isAdmin: boolean;
-  isTeacher: boolean;
   isStudentViewMode: boolean;
   setStudentViewMode: (enabled: boolean) => void;
   toggleStudentViewMode: () => void;
   loginWithGoogle: () => Promise<void>;
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode'>>) => Promise<void>;
+  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected'>>) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
 }
@@ -171,6 +170,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Mirrors only the safe, public fields of a profile into /leaderboard/{uid}
+  // -- never the email address -- so classmates can see rankings without
+  // ever being able to read each other's full user document.
+  const syncLeaderboardEntry = (profile: UserProfile) => {
+    if (!isFirebaseConfigured || !db || !doc || !setDoc) return;
+    const entryRef = doc(db, 'leaderboard', profile.uid);
+    setDoc(entryRef, {
+      uid: profile.uid,
+      displayName: profile.displayName,
+      avatar: profile.avatar,
+      classroomCode: profile.classroomCode,
+      coins: profile.coins,
+      totalCardsCollected: profile.totalCardsCollected ?? 0,
+      uniqueCardsCollected: profile.uniqueCardsCollected ?? 0
+    }, { merge: true }).catch(e => console.warn('Leaderboard sync notice:', e));
+  };
+
   const checkAdminPrivilege = (profile: UserProfile | null, fbUser: FirebaseUser | null): boolean => {
     if (!profile) return false;
     if (isUserAdminEmail(profile.email)) return true;
@@ -179,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = checkAdminPrivilege(userProfile, currentUser);
-  const isTeacher = isAdmin || userProfile?.role === 'teacher';
 
   // Fetch-or-create the Firestore profile for a VERIFIED school account.
   // Role and displayName are always re-derived from the verified email /
@@ -220,11 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // A brand-new account is always a student unless it's the designated
     // admin email. A 'teacher' role can only ever be granted afterward by
     // an admin (via the Admin Console / Firestore) -- never by the user.
-    const role: UserRole = isAdminUser
-      ? 'admin'
-      : existingData.role === 'teacher'
-      ? 'teacher'
-      : 'student';
+    const role: UserRole = isAdminUser ? 'admin' : 'student';
 
     const displayName = deriveDisplayName(
       googleDisplayName,
@@ -253,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
+    syncLeaderboardEntry(combinedProfile);
     saveProfileLocally(combinedProfile);
     return combinedProfile;
   };
@@ -367,7 +379,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Only avatar & classroomCode are user-editable. displayName, email, and
   // role are intentionally NOT accepted here -- see also firestore.rules,
   // which independently blocks any client attempt to write those fields.
-  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode'>>) => {
+  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected'>>) => {
     if (!userProfile) return;
     const updated: UserProfile = { ...userProfile, ...updates };
     saveProfileLocally(updated);
@@ -380,6 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Firestore profile update notice:', e);
     }
+    syncLeaderboardEntry(updated);
   };
 
   const updateCoins = async (deltaCoins: number): Promise<number> => {
@@ -396,6 +409,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Firestore coins update notice:', e);
     }
+    syncLeaderboardEntry(updated);
     return newCoins;
   };
 
@@ -406,7 +420,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading,
       error,
       isAdmin,
-      isTeacher,
       isStudentViewMode,
       setStudentViewMode,
       toggleStudentViewMode,

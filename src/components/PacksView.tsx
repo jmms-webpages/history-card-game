@@ -150,8 +150,16 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
           return (
             <div
               key={pack.packId}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-5 shadow-lg flex flex-col justify-between transition-all duration-200 group hover:-translate-y-1 hover:shadow-xl relative overflow-hidden"
+              className={`bg-slate-900 border rounded-3xl p-5 shadow-lg flex flex-col justify-between transition-all duration-200 group relative overflow-hidden ${
+                pack.active ? 'border-slate-800 hover:border-slate-700 hover:-translate-y-1 hover:shadow-xl' : 'border-slate-800/60 opacity-70'
+              }`}
             >
+              {!pack.active && (
+                <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/90 border border-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider">
+                  <Lock className="w-3 h-3" />
+                  <span>Locked by Teacher</span>
+                </div>
+              )}
               {/* Booster Foil Art Wrapper */}
               <div>
                 <div
@@ -230,32 +238,39 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                   <span className="text-[10px] text-slate-400 font-normal uppercase">Coins</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleOpenPack(pack)}
-                  disabled={isOpeningThis}
-                  className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md ${
-                    canAfford
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 hover:shadow-amber-500/20'
-                      : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
-                  }`}
-                >
-                  {isOpeningThis ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                      <span>Ripping Pack...</span>
-                    </>
-                  ) : canAfford ? (
-                    <>
-                      <Package className="w-4 h-4" />
-                      <span>Open Pack</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Need {pack.cost - userCoins} Coins</span>
-                    </>
-                  )}
-                </button>
+                {pack.active ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPack(pack)}
+                    disabled={isOpeningThis}
+                    className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                      canAfford
+                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 hover:shadow-amber-500/20'
+                        : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {isOpeningThis ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        <span>Ripping Pack...</span>
+                      </>
+                    ) : canAfford ? (
+                      <>
+                        <Package className="w-4 h-4" />
+                        <span>Open Pack</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Need {pack.cost - userCoins} Coins</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <span className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-slate-950 border border-slate-800 text-slate-500">
+                    <Lock className="w-4 h-4" />
+                    <span>Locked</span>
+                  </span>
+                )}
               </div>
             </div>
           );

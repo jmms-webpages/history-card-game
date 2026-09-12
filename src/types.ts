@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'teacher' | 'admin';
+export type UserRole = 'student' | 'admin';
 
 export type CardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Legendary' | 'Mythical';
 
@@ -153,6 +153,5 @@ export type NavigationTab =
   | 'collection'
   | 'leaderboard'
   | 'profile'
-  | 'teacher'
   | 'admin'
   | 'student-view';

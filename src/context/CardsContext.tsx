@@ -36,25 +36,24 @@ interface CardsContextType {
   };
   addCustomCard: (card: Omit<Card, 'cardId'>) => void;
   toggleCardActive: (cardId: string) => void;
+  togglePackActive: (packId: string) => void;
 }
 
 const CardsContext = createContext<CardsContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_CARDS_KEY = 'history_card_quest_cards';
+const LOCAL_STORAGE_PACKS_KEY = 'history_card_quest_pack_overrides';
 const LOCAL_STORAGE_INVENTORY_PREFIX = 'history_card_quest_inv_';
 
 export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userProfile, updateCoins, updateUserProfile } = useAuth();
-  
+
   // Custom or loaded cards
   const [cards, setCards] = useState<Card[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_CARDS_KEY);
       if (saved) {
         const parsed: Card[] = JSON.parse(saved);
-        // If new cards have been added to INITIAL_CARDS since this browser
-        // last cached the card list, merge them in automatically instead of
-        // silently hiding them behind a stale cache.
         const existingIds = new Set(parsed.map(c => c.cardId));
         const missingInitials = INITIAL_CARDS.filter(c => !existingIds.has(c.cardId));
         return missingInitials.length > 0 ? [...parsed, ...missingInitials] : parsed;
@@ -65,9 +64,98 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_CARDS;
   });
 
-  // The set of cards that actually belong to a given pack. A card belongs
-  // to a pack if its packTheme matches the pack's theme, or (as a fallback
-  // link) its unitId matches the unit a "pack-unit-N" pack represents.
+  // Card catalog data (name/rarity/description/etc.) ships inside the app
+  // bundle -- only the `active` flag ever needs to travel between admins
+  // and students, so Firestore only stores lightweight {cardId, active}
+  // override docs rather than the whole curriculum.
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    (async () => {
+      try {
+        const cardsColl = collection(db, 'cards');
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const snap = await Promise.race([getDocs(cardsColl), timeout]) as any;
+        if (snap && snap.docs && snap.docs.length > 0) {
+          const overrides = new Map<string, boolean>();
+          snap.docs.forEach((d: any) => {
+            const data = d.data();
+            if (data?.cardId && typeof data.active === 'boolean') {
+              overrides.set(data.cardId, data.active);
+            }
+          });
+          setCards(prev => {
+            const updated = prev.map(c => overrides.has(c.cardId) ? { ...c, active: overrides.get(c.cardId)! } : c);
+            try {
+              localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+        }
+      } catch (e) {
+        console.warn('Card catalog fetch notice (using cached cards):', e);
+      }
+    })();
+  }, []);
+
+  // Pack "open/closed" state (e.g. Unit 5 packs closed until the class
+  // reaches Unit 5). Packs themselves are static curriculum data, so only
+  // a lightweight {packId, active} override doc is stored in Firestore.
+  const [packOverrides, setPackOverrides] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_PACKS_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    (async () => {
+      try {
+        const packsColl = collection(db, 'packs');
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const snap = await Promise.race([getDocs(packsColl), timeout]) as any;
+        if (snap && snap.docs && snap.docs.length > 0) {
+          const overrides: Record<string, boolean> = {};
+          snap.docs.forEach((d: any) => {
+            const data = d.data();
+            if (data?.packId && typeof data.active === 'boolean') {
+              overrides[data.packId] = data.active;
+            }
+          });
+          setPackOverrides(overrides);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_PACKS_KEY, JSON.stringify(overrides));
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Pack availability fetch notice (using cached packs):', e);
+      }
+    })();
+  }, []);
+
+  const togglePackActive = (packId: string) => {
+    const currentPack = INITIAL_PACKS.find(p => p.packId === packId);
+    const currentlyActive = packOverrides[packId] ?? currentPack?.active ?? true;
+    const newActive = !currentlyActive;
+
+    setPackOverrides(prev => {
+      const next = { ...prev, [packId]: newActive };
+      try {
+        localStorage.setItem(LOCAL_STORAGE_PACKS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      const packRef = doc(db, 'packs', packId);
+      setDoc(packRef, { packId, active: newActive }, { merge: true }).catch(e => {
+        console.warn('Pack availability sync notice:', e);
+      });
+    }
+  };
+
   const getPackCardPoolInternal = (pack: Pack, activeCards: Card[]): Card[] => {
     return activeCards.filter(c =>
       c.packTheme === pack.theme ||
@@ -81,23 +169,23 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return pool.length > 0 ? pool : activeCards;
   };
 
-  // Dynamically compute packs with real-time possible card counts based on active cards
   const packs = useMemo<Pack[]>(() => {
     const activeCards = cards.filter(c => c.active);
     return INITIAL_PACKS.map(pack => {
       const pool = getPackCardPoolInternal(pack, activeCards);
       const totalPossible = pool.length > 0 ? pool.length : activeCards.length;
+      const active = packOverrides[pack.packId] ?? pack.active;
       return {
         ...pack,
-        cardCount: totalPossible
+        cardCount: totalPossible,
+        active
       };
     });
-  }, [cards]);
+  }, [cards, packOverrides]);
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
 
-  // Load user inventory whenever userProfile changes
   useEffect(() => {
     if (!userProfile?.uid) {
       setInventory([]);
@@ -107,8 +195,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const uid = userProfile.uid;
     const storageKey = `${LOCAL_STORAGE_INVENTORY_PREFIX}${uid}`;
-    
-    // Initial read from localStorage for instant display
+
     let localInv: InventoryItem[] = [];
     try {
       const saved = localStorage.getItem(storageKey);
@@ -120,7 +207,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
-    // If live Firebase is configured, attempt gentle async read with timeout
     if (isFirebaseConfigured && db && collection && getDocs) {
       const fetchFirestoreInv = async () => {
         try {
@@ -148,7 +234,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [userProfile?.uid]);
 
-  // Persist inventory
   const saveInventory = (newInv: InventoryItem[]) => {
     setInventory(newInv);
     if (!userProfile?.uid) return;
@@ -161,16 +246,17 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
-    // Update profile metrics
+    // Keep the profile's card-collection stats in sync -- these are what
+    // the Admin Console roster and the Honor Roll leaderboard read.
     const uniqueIds = new Set(newInv.map(i => i.cardId));
     if (updateUserProfile) {
       updateUserProfile({
-        // keep profile sync clean
+        totalCardsCollected: newInv.length,
+        uniqueCardsCollected: uniqueIds.size
       });
     }
   };
 
-  // Card lookup map
   const cardMap = useMemo(() => {
     const map = new Map<string, Card>();
     cards.forEach(c => map.set(c.cardId, c));
@@ -181,7 +267,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cardMap.get(cardId);
   };
 
-  // Enriched inventory items
   const inventoryCards = useMemo(() => {
     return inventory
       .map(item => {
@@ -191,7 +276,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .filter((item): item is InventoryItem & { card: Card } => item !== null);
   }, [inventory, cardMap]);
 
-  // Inventory count map
   const ownershipMap = useMemo(() => {
     const map = new Map<string, number>();
     inventory.forEach(item => {
@@ -208,11 +292,10 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return ownershipMap.get(cardId) || 0;
   };
 
-  // Roll rarity based on weights
   const rollRarity = (weights: Record<CardRarity, number>): CardRarity => {
     const rand = Math.random();
     let cumulative = 0;
-    
+
     const rarities: CardRarity[] = ['Mythical', 'Legendary', 'Rare', 'Uncommon', 'Common'];
     for (const r of rarities) {
       cumulative += weights[r];
@@ -223,26 +306,15 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 'Common';
   };
 
-  // Rarity tiers ordered highest -> lowest, used to find the nearest
-  // available rarity WITHOUT ever leaving the pack's own card pool.
   const RARITY_ORDER: CardRarity[] = ['Mythical', 'Legendary', 'Rare', 'Uncommon', 'Common'];
 
-  // Draw 1 card for this pack. Cards are ALWAYS drawn from the pack's own
-  // pool -- a pack can never hand out a card from a different pack/theme.
-  // If the pack itself has no linked cards at all (e.g. a curated
-  // "all eras" pack), we intentionally draw from every active card instead,
-  // since that pack has no card pool of its own by design.
   const drawCard = (rarity: CardRarity, pack: Pack): Card => {
     const activeCards = cards.filter(c => c.active);
     const packPool = getPackCardPoolInternal(pack, activeCards);
     const scopedPool = packPool.length > 0 ? packPool : activeCards;
 
-    // 1. Try the exact rolled rarity within this pack's own cards.
     let candidates = scopedPool.filter(c => c.rarity === rarity);
 
-    // 2. If this pack doesn't stock that exact rarity, step to the nearest
-    // available rarity -- checking one tier down before one tier up at each
-    // step -- but never leave the pack's own pool.
     if (candidates.length === 0) {
       const startIndex = RARITY_ORDER.indexOf(rarity);
       for (let offset = 1; offset < RARITY_ORDER.length && candidates.length === 0; offset++) {
@@ -257,8 +329,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // 3. Absolute last resort (a pack with active cards of no rarity at
-    // all is misconfigured) -- still stay within the pack's own pool.
     if (candidates.length === 0) {
       candidates = scopedPool;
     }
@@ -267,38 +337,33 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return candidates[randomIndex];
   };
 
-  // Open 5-Card Booster Pack
   const openPack = async (packId: string): Promise<OpenPackResult> => {
     const pack = packs.find(p => p.packId === packId) || packs[0];
     const cost = pack.cost;
 
-    // Check user coins
+    if (!pack.active) {
+      throw new Error('This pack is currently locked by your teacher. Check back once your class reaches that unit!');
+    }
+
     if (!userProfile || (userProfile.coins || 0) < cost) {
       throw new Error(`Insufficient coins. You need ${cost} coins to open this pack.`);
     }
 
-    // Deduct coins
     await updateCoins(-cost);
-
-    // Sound effect: pack tear
     sounds.playPackRip();
 
-    // Roll 5 cards: 4 standard rolls + 1 guaranteed Uncommon-or-better slot
     const pulledCards: Card[] = [];
-    
-    // Slot 1-4: Standard rolls
+
     for (let i = 0; i < 4; i++) {
       const rarity = rollRarity(DEFAULT_GAME_SETTINGS.rarityProbabilities);
       const card = drawCard(rarity, pack);
       pulledCards.push(card);
     }
 
-    // Slot 5: Guaranteed Uncommon-or-better slot
     const guaranteedRarity = rollRarity(DEFAULT_GAME_SETTINGS.guaranteedSlotProbabilities);
     const guaranteedCard = drawCard(guaranteedRarity, pack);
     pulledCards.push(guaranteedCard);
 
-    // Track new vs duplicates
     let newCardsCount = 0;
     let duplicateCardsCount = 0;
     const now = new Date().toISOString();
@@ -323,7 +388,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isDuplicate
       });
 
-      // Try async write to Firestore if configured
       if (isFirebaseConfigured && db && doc && setDoc && userProfile?.uid) {
         const itemRef = doc(db, 'users', userProfile.uid, 'inventory', instanceId);
         setDoc(itemRef, {
@@ -335,11 +399,9 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
-    // Save updated inventory
     const updatedInventory = [...inventory, ...newInventoryItems];
     saveInventory(updatedInventory);
 
-    // Check if any high rarity card was pulled for fanfare sound
     const hasMythical = pulledCards.some(c => c.rarity === 'Mythical');
     const hasLegendary = pulledCards.some(c => c.rarity === 'Legendary');
     const hasRare = pulledCards.some(c => c.rarity === 'Rare');
@@ -362,7 +424,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
-  // Sell 1 duplicate card
   const sellDuplicate = async (instanceId: string): Promise<number> => {
     const itemIndex = inventory.findIndex(i => i.instanceId === instanceId);
     if (itemIndex === -1) return 0;
@@ -371,7 +432,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const card = cardMap.get(item.cardId);
     if (!card) return 0;
 
-    // Verify user owns at least 2 copies before allowing duplicate sell
     const totalCopies = ownershipMap.get(item.cardId) || 0;
     if (totalCopies <= 1) {
       throw new Error("You only have one copy of this card! The last copy is protected in your binder.");
@@ -379,16 +439,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const sellValue = DEFAULT_GAME_SETTINGS.duplicateSellValues[card.rarity] || 5;
 
-    // Remove from inventory
     const updated = [...inventory];
     updated.splice(itemIndex, 1);
     saveInventory(updated);
 
-    // Award coins
     await updateCoins(sellValue);
     sounds.playCoin();
 
-    // Async delete from Firestore if active
     if (isFirebaseConfigured && db && doc && deleteDoc && userProfile?.uid) {
       const itemRef = doc(db, 'users', userProfile.uid, 'inventory', instanceId);
       deleteDoc(itemRef).catch(() => {});
@@ -397,7 +454,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return sellValue;
   };
 
-  // Sell all duplicates across whole binder
   const sellAllDuplicates = async (): Promise<{ soldCount: number; coinsEarned: number }> => {
     const keepSet = new Set<string>();
     const keepItems: InventoryItem[] = [];
@@ -420,14 +476,10 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { soldCount: 0, coinsEarned: 0 };
     }
 
-    // Save pruned inventory
     saveInventory(keepItems);
-
-    // Award all coins
     await updateCoins(totalCoins);
     sounds.playCoin();
 
-    // Delete sold instances from Firestore in background
     if (isFirebaseConfigured && db && doc && deleteDoc && userProfile?.uid) {
       sellItems.forEach(item => {
         const itemRef = doc(db, 'users', userProfile.uid, 'inventory', item.instanceId);
@@ -441,15 +493,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
-  // Stats calculation
   const stats = useMemo(() => {
     const totalCards = inventory.length;
     const uniqueCards = ownershipMap.size;
     const activeCards = cards.filter(c => c.active);
     const totalInSet = activeCards.length;
     const completionPercentage = totalInSet > 0 ? Math.round((uniqueCards / totalInSet) * 100) : 0;
-    
-    // Duplicates calculation
+
     let duplicatesCount = 0;
     let potentialDuplicateSellValue = 0;
     const countedCards = new Set<string>();
@@ -476,7 +526,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [inventory, ownershipMap, cards, cardMap]);
 
-  // Admin / Teacher functions
   const addCustomCard = (cardData: Omit<Card, 'cardId'>) => {
     const newCardId = `card-custom-${Date.now()}`;
     const newCard: Card = {
@@ -493,12 +542,26 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleCardActive = (cardId: string) => {
-    const updated = cards.map(c => c.cardId === cardId ? { ...c, active: !c.active } : c);
+    let newActive = true;
+    const updated = cards.map(c => {
+      if (c.cardId === cardId) {
+        newActive = !c.active;
+        return { ...c, active: newActive };
+      }
+      return c;
+    });
     setCards(updated);
     try {
       localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
     } catch {
       // ignore
+    }
+
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      const cardRef = doc(db, 'cards', cardId);
+      setDoc(cardRef, { cardId, active: newActive }, { merge: true }).catch(e => {
+        console.warn('Card catalog sync notice:', e);
+      });
     }
   };
 
@@ -518,7 +581,8 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       getPackCardPool,
       stats,
       addCustomCard,
-      toggleCardActive
+      toggleCardActive,
+      togglePackActive
     }}>
       {children}
     </CardsContext.Provider>

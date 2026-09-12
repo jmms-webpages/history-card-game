@@ -21,8 +21,7 @@ export const ProfileView: React.FC = () => {
     userProfile, 
     updateUserProfile, 
     updateCoins, 
-    logout, 
-    isTeacher, 
+    logout,  
     isAdmin, 
     isStudentViewMode, 
     toggleStudentViewMode 
@@ -69,7 +68,7 @@ export const ProfileView: React.FC = () => {
                 {userProfile.displayName}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                {isAdmin ? 'Master Administrator' : userProfile.role === 'teacher' ? 'Classroom Educator' : '8th Grade Student'}
+                {isAdmin ? 'Master Administrator' : '8th Grade Student'}
               </span>
             </div>
 

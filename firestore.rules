@@ -55,7 +55,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'])
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
@@ -127,6 +127,19 @@ service cloud.firestore {
         allow delete: if isOwner(userId) || isAdmin();
         allow update: if isAdmin();
       }
+    }
+
+    // Public, safe-fields-only leaderboard entry per student. Deliberately
+    // separate from /users/{userId} so classmates can see rankings without
+    // ever being able to read each other's email address.
+    match /leaderboard/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() || (
+        isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        !request.resource.data.keys().hasAny(['email'])
+      );
+      allow delete: if isAdmin();
     }
 
     // Content: Questions, Cards, Packs, Units, Standards

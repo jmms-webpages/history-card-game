@@ -29,7 +29,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
-  const { userProfile, isTeacher } = useAuth();
+  const { userProfile } = useAuth();
   const { dailyActivity, gameSettings } = useQuestions();
   const { stats, inventoryCards, isCardOwned, getCardCopies } = useCards();
 
@@ -59,7 +59,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono truncate">
-                  {userProfile.classroomCode} • {userProfile.role === 'teacher' ? 'Educator' : (userProfile.role === 'admin' ? 'Teacher & Director' : '8th Grade Historian')}
+                  {userProfile.classroomCode} • {userProfile.role === 'admin' ? 'Teacher & Director' : '8th Grade Historian'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100 truncate break-words">

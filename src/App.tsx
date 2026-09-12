@@ -15,13 +15,12 @@ import { QuestionsView } from './components/QuestionsView';
 import { PacksView } from './components/PacksView';
 import { CollectionView } from './components/CollectionView';
 import { ProfileView } from './components/ProfileView';
-import { TeacherDashboardView } from './components/TeacherDashboardView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { Eye } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
-  const { userProfile, loading, isStudentViewMode, setStudentViewMode, isTeacher, isAdmin } = useAuth();
+  const { userProfile, loading, isStudentViewMode, setStudentViewMode, isAdmin } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
   const [timedOut, setTimedOut] = useState(false);
 
@@ -59,7 +58,7 @@ const MainAppContent: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         
         {/* Student View Banner across main window */}
-        {isStudentViewMode && (isAdmin || isTeacher) && (
+        {isStudentViewMode && isAdmin && (
           <div className="bg-emerald-950/90 border-b border-emerald-700/60 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 text-emerald-200 sticky top-0 z-20 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -68,16 +67,6 @@ const MainAppContent: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setStudentViewMode(false);
-                  setCurrentTab('teacher');
-                }}
-                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
-              >
-                Teacher Portal
-              </button>
               {isAdmin && (
                 <button
                   type="button"
@@ -101,7 +90,6 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
           {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
           {currentTab === 'profile' && <ProfileView />}
-          {currentTab === 'teacher' && <TeacherDashboardView onNavigate={setCurrentTab} />}
           {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}
         </main>
 
