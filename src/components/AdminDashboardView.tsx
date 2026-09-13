@@ -4,7 +4,8 @@ import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
-import { isFirebaseConfigured, db, collection, getDocs, query, where } from '../firebase/config';
+import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc } from '../firebase/config';
+import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { 
   ShieldCheck, 
   Settings, 
@@ -86,6 +87,70 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     return s.displayName.toLowerCase().includes(term) || (s.email || '').toLowerCase().includes(term);
   });
 
+  // Honor Roll snapshot -- deliberately NOT automatic. Rankings only change
+  // when you click this, reusing the roster already loaded above so it
+  // costs zero extra reads beyond what "Refresh" already does.
+  const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false);
+  const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
+  const [unitMasteryAverages, setUnitMasteryAverages] = useState
+    { unitId: string; unitName: string; avgPercent: number }[]
+  >([]);
+
+  const refreshLeaderboardSnapshot = async () => {
+    if (!isFirebaseConfigured || !db || !doc || !setDoc || students.length === 0) return;
+    setRefreshingLeaderboard(true);
+    try {
+      const ranked = [...students]
+        .sort((a, b) =>
+          (b.uniqueCardsCollected || 0) - (a.uniqueCardsCollected || 0) ||
+          (b.totalCardsCollected || 0) - (a.totalCardsCollected || 0)
+        )
+        .slice(0, 50)
+        .map(s => ({
+          uid: s.uid,
+          displayName: s.displayName,
+          avatar: s.avatar,
+          classroomCode: s.classroomCode,
+          coins: s.coins,
+          uniqueCardsCollected: s.uniqueCardsCollected || 0,
+          totalCardsCollected: s.totalCardsCollected || 0
+        }));
+
+      const snapshotRef = doc(db, 'leaderboard', 'snapshot');
+      await setDoc(snapshotRef, {
+        entries: ranked,
+        generatedAt: new Date().toISOString()
+      });
+      setLeaderboardUpdatedAt(new Date().toLocaleString());
+
+      // Class Mastery by Unit -- a free byproduct of data already in hand,
+      // sorted worst-first so it's easy to spot what needs reteaching.
+      const unitTotals: Record<string, { sum: number; count: number }> = {};
+      students.forEach(s => {
+        INITIAL_UNITS.forEach(u => {
+          const points = s.unitMastery?.[u.unitId] || 0;
+          if (!unitTotals[u.unitId]) unitTotals[u.unitId] = { sum: 0, count: 0 };
+          unitTotals[u.unitId].sum += points;
+          unitTotals[u.unitId].count += 1;
+        });
+      });
+      const averages = INITIAL_UNITS.map(u => {
+        const t = unitTotals[u.unitId] || { sum: 0, count: 1 };
+        const avgPoints = t.count > 0 ? t.sum / t.count : 0;
+        return {
+          unitId: u.unitId,
+          unitName: u.unitName,
+          avgPercent: Math.round((avgPoints / MASTERY_TARGET_POINTS) * 100)
+        };
+      }).sort((a, b) => a.avgPercent - b.avgPercent);
+      setUnitMasteryAverages(averages);
+    } catch (e) {
+      console.warn('Leaderboard refresh notice:', e);
+    } finally {
+      setRefreshingLeaderboard(false);
+    }
+  };
+
   // Economy state
   const [dailyLimit, setDailyLimit] = useState(gameSettings.dailyQuestionLimit);
   const [correctReward, setCorrectReward] = useState(gameSettings.correctCoinReward);
@@ -105,6 +170,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [newStandardId, setNewStandardId] = useState('OH-SS8-2026.1');
   const [newDifficulty, setNewDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [newTopic, setNewTopic] = useState('');
+  const [newIsOST, setNewIsOST] = useState(false);
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'trivia' | 'ost'>('all');
 
   // Card catalog filters
   const [filterCardUnit, setFilterCardUnit] = useState<string>('all');
@@ -142,8 +209,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       topic: newTopic.trim() || 'Ohio History Concepts',
       historicalEra: 'Early America (1492–1877)',
       difficulty: newDifficulty,
-      active: true
+      active: !newIsOST, // OST questions start inactive -- flip one on when it's its day
+      isOST: newIsOST
     });
+
+    setNewQText('');
+    setNewAnswers(['', '', '', '']);
+    setNewExplanation('');
+    setNewTopic('');
+    setNewIsOST(false);
+    setShowAddModal(false);
 
     setNewQText('');
     setNewAnswers(['', '', '', '']);
@@ -153,6 +228,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   };
 
   const filteredQuestions = questions.filter(q => {
+    if (questionTypeFilter === 'trivia' && q.isOST) return false;
+    if (questionTypeFilter === 'ost' && !q.isOST) return false;
     if (filterUnit !== 'all' && q.unitId !== filterUnit) return false;
     if (questionSearch.trim()) {
       const qText = q.questionText.toLowerCase();
@@ -341,7 +418,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
               />
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
               <span className="text-xs text-slate-400 font-mono">{filteredStudents.length} of {students.length} students</span>
               <button
                 type="button"
@@ -350,10 +427,51 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingStudents ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+                <span>Refresh Roster</span>
+              </button>
+              <button
+                type="button"
+                onClick={refreshLeaderboardSnapshot}
+                disabled={refreshingLeaderboard || students.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50"
+                title="Publish today's rankings to the Honor Roll -- students won't see any change until you click this."
+              >
+                <Award className={`w-3.5 h-3.5 ${refreshingLeaderboard ? 'animate-pulse' : ''}`} />
+                <span>{refreshingLeaderboard ? 'Publishing...' : 'Publish Honor Roll'}</span>
               </button>
             </div>
           </div>
+
+          {leaderboardUpdatedAt && (
+            <p className="text-[11px] text-slate-500 -mt-1">
+              Honor Roll last published: <span className="text-slate-300 font-mono">{leaderboardUpdatedAt}</span> — students see this exact snapshot until you publish again.
+            </p>
+          )}
+
+          {unitMasteryAverages.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow">
+              <h3 className="font-bold text-slate-100 text-sm mb-1">Class Mastery by Unit</h3>
+              <p className="text-xs text-slate-400 mb-4">Sorted worst to best — a low number here is a signal worth reteaching, not a single "worst question," but the trend.</p>
+              <div className="space-y-3">
+                {unitMasteryAverages.map(u => (
+                  <div key={u.unitId}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-bold text-slate-200">{u.unitName}</span>
+                      <span className={`font-mono font-bold ${u.avgPercent < 40 ? 'text-rose-400' : u.avgPercent < 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {u.avgPercent}% avg mastery
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full rounded-full ${u.avgPercent < 40 ? 'bg-rose-500' : u.avgPercent < 70 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                        style={{ width: `${u.avgPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
@@ -499,6 +617,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <div className="flex flex-wrap items-center gap-3 flex-1">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-xs text-slate-300 font-medium">Type:</span>
+                <select
+                  value={questionTypeFilter}
+                  onChange={(e) => setQuestionTypeFilter(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400"
+                >
+                  <option value="all">All Types</option>
+                  <option value="trivia">Daily Trivia Only</option>
+                  <option value="ost">OST Prep Only</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-300 font-medium">Unit:</span>
                 <select
                   value={filterUnit}
@@ -561,8 +691,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                         q.active ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400'
                       }`}>
-                        {q.active ? 'Active' : 'Inactive'}
+                        {q.active ? (q.isOST ? "Today's OST Question" : 'Active') : 'Inactive'}
                       </span>
+                      {q.isOST && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                          OST
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm font-semibold text-slate-100">
                       {idx + 1}. {q.questionText}
@@ -1096,6 +1231,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   placeholder="Explain why the answer is correct and cite historical context..."
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40">
+                <input
+                  type="checkbox"
+                  id="new-question-is-ost"
+                  checked={newIsOST}
+                  onChange={(e) => setNewIsOST(e.target.checked)}
+                  className="w-4 h-4 accent-indigo-500 cursor-pointer"
+                />
+                <label htmlFor="new-question-is-ost" className="text-xs text-indigo-200 cursor-pointer">
+                  This is an OST Prep question (ELA-style, social studies content) — worth 20 coins, one shot per day. It saves as <strong>inactive</strong>; toggle it on for the day you want the whole class to see it, and toggle yesterday's off.
+                </label>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">

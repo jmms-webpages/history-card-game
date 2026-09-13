@@ -42,10 +42,21 @@ export const QuestionsView: React.FC = () => {
     reviewQueueCount,
     isReviewMode,
     startReviewMode,
-    exitReviewMode
+    exitReviewMode,
+    todaysOSTQuestion,
+    hasAnsweredOST,
+    lastOSTResult,
+    submitOSTAnswer
   } = useQuestions();
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedOSTOption, setSelectedOSTOption] = useState<number | null>(null);
+
+  const handleSelectOSTAnswer = (index: number) => {
+    if (hasAnsweredOST || selectedOSTOption !== null) return;
+    setSelectedOSTOption(index);
+    submitOSTAnswer(index);
+  };
 
   useEffect(() => {
     setSelectedOption(null);
@@ -184,8 +195,90 @@ export const QuestionsView: React.FC = () => {
         )}
       </div>
 
-      {/* Review Mode entry/exit banner */}
-      {isReviewMode ? (
+      {/* Daily OST-Prep Challenge -- one question, whole class, one shot */}
+      {todaysOSTQuestion && !isReviewMode && (
+        <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/40 rounded-2xl p-5 sm:p-6 shadow-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold uppercase tracking-wider">
+              OST Prep Challenge
+            </span>
+            <span className="text-[11px] text-slate-400">One question · Whole class · One shot only</span>
+          </div>
+
+          {hasAnsweredOST ? (
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-slate-200">
+                  {lastOSTResult ? (lastOSTResult.isCorrect ? "Nice work — you've got today's covered." : "Attempted — come back tomorrow for a new one.") : "You've already answered today's OST question."}
+                </p>
+                {lastOSTResult && (
+                  <p className="text-xs text-slate-400 mt-1">{lastOSTResult.explanation}</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-base font-semibold text-slate-100 leading-relaxed mb-4">
+                {todaysOSTQuestion.questionText}
+              </h3>
+              <div className="space-y-2.5">
+                {todaysOSTQuestion.answers.map((answer, index) => {
+                  const letter = String.fromCharCode(65 + index);
+                  const isSelected = selectedOSTOption === index;
+                  const isCorrectAnswer = index === todaysOSTQuestion.correctAnswer;
+                  let buttonStyle = "bg-slate-950 hover:bg-slate-800/80 border-slate-800 text-slate-200";
+
+                  if (selectedOSTOption !== null) {
+                    if (isCorrectAnswer) {
+                      buttonStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500";
+                    } else if (isSelected) {
+                      buttonStyle = "bg-rose-950/60 border-rose-500 text-rose-200 ring-1 ring-rose-500";
+                    } else {
+                      buttonStyle = "bg-slate-950/40 border-slate-800/40 text-slate-500 opacity-60";
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleSelectOSTAnswer(index)}
+                      disabled={selectedOSTOption !== null}
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 cursor-pointer disabled:cursor-default ${buttonStyle}`}
+                    >
+                      <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-mono font-bold shrink-0">
+                        {letter}
+                      </span>
+                      <span className="flex-1 text-sm leading-snug">{answer}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedOSTOption !== null && lastOSTResult && (
+                <div className="mt-4 pt-4 border-t border-slate-800 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className={`text-sm font-bold flex items-center gap-2 ${lastOSTResult.isCorrect ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {lastOSTResult.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <Award className="w-5 h-5" />}
+                      {lastOSTResult.isCorrect ? 'Correct!' : "Not quite — that's okay, try again tomorrow."}
+                    </span>
+                    {lastOSTResult.coinsAwarded > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold">
+                        <Coins className="w-3.5 h-3.5 text-amber-400" />
+                        <span>+{lastOSTResult.coinsAwarded} Coins</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{lastOSTResult.explanation}</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Review Mode entry/exit banner */}      {isReviewMode ? (
         <div className="bg-gradient-to-r from-emerald-500/10 via-slate-900 to-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">

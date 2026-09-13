@@ -135,16 +135,16 @@ export const INITIAL_STANDARDS: Standard[] = [
 ];
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
-  dailyQuestionLimit: 25,
+  dailyQuestionLimit: 20,
   correctCoinReward: 10,
   incorrectCoinReward: 3,
   standardPackCost: 100,
   duplicateSellValues: {
-    Common: 5,
-    Uncommon: 15,
-    Rare: 40,
-    Legendary: 150,
-    Mythical: 500
+    Common: 3,
+    Uncommon: 8,
+    Rare: 15,
+    Legendary: 20,
+    Mythical: 50
   },
   rarityProbabilities: {
     Common: 0.65,

@@ -15,6 +15,10 @@ import {
   getDocs
 } from '../firebase/config';
 
+// Today's OST-prep bonus question is worth more, but it's one shot only --
+// no retry, no partial credit for a miss.
+const OST_CORRECT_REWARD = 20;
+
 interface AnswerResult {
   isCorrect: boolean;
   correctAnswerIndex: number;
@@ -45,12 +49,16 @@ interface QuestionsContextType {
   toggleQuestionActive: (questionId: string) => void;
   deleteQuestion: (questionId: string) => void;
   resetDailyActivity: () => void;
-  // Review Mode -- re-practice previously-missed questions, no coins,
-  // no daily-count impact, and mastery only ever goes up, never down.
   reviewQueueCount: number;
   isReviewMode: boolean;
   startReviewMode: () => void;
   exitReviewMode: () => void;
+  // Daily OST-prep bonus question -- same one question for the whole class,
+  // whichever one the admin currently has marked active.
+  todaysOSTQuestion: Question | null;
+  hasAnsweredOST: boolean;
+  lastOSTResult: AnswerResult | null;
+  submitOSTAnswer: (answerIndex: number) => AnswerResult | null;
 }
 
 const QuestionsContext = createContext<QuestionsContextType | undefined>(undefined);
@@ -83,6 +91,40 @@ const mergeRemoteQuestions = (base: Question[], remoteDocs: any[]): Question[] =
   });
 
   return Array.from(byId.values());
+};
+
+// Deterministic seeded shuffle: the same student on the same day always
+// gets the same order (so it stays consistent within a session), but a
+// different order than yesterday, and a different order than every other
+// student -- which also closes an "answer-sharing" loophole, since nobody's
+// question order matches anyone else's.
+const hashSeed = (str: string): number => {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+};
+
+const mulberry32 = (seed: number) => {
+  let t = seed;
+  return () => {
+    t |= 0;
+    t = (t + 0x6D2B79F5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
+  const rand = mulberry32(seed);
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 };
 
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -209,7 +251,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       questionsAnswered: 0,
       correctAnswers: 0,
       coinsEarned: 0,
-      lastQuestionAt: new Date().toISOString()
+      lastQuestionAt: new Date().toISOString(),
+      ostAnsweredToday: false
     };
   });
 
@@ -224,7 +267,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           questionsAnswered: 0,
           correctAnswers: 0,
           coinsEarned: 0,
-          lastQuestionAt: new Date().toISOString()
+          lastQuestionAt: new Date().toISOString(),
+          ostAnsweredToday: false
         });
       }
     } catch {}
@@ -240,8 +284,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  // Personal "missed questions" queue -- local to this browser, like the
-  // daily counters above. A student re-practices these in Review Mode.
   const reviewQueueKey = `ohio_review_queue_${userProfile?.uid || 'guest'}`;
   const [reviewQueueIds, setReviewQueueIds] = useState<string[]>(() => {
     try {
@@ -275,9 +317,21 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [streak, setStreak] = useState<number>(0);
   const [practiceMode, setPracticeMode] = useState<boolean>(false);
+  const [lastOSTResult, setLastOSTResult] = useState<AnswerResult | null>(null);
 
+  // Regular daily trivia pool excludes OST questions -- those live in their
+  // own separate one-a-day flow.
   const activeQuestions = useMemo(() => {
-    return questions.filter(q => q.active);
+    return questions.filter(q => q.active && !q.isOST);
+  }, [questions]);
+
+  const dailyShuffledQuestions = useMemo(() => {
+    const seed = hashSeed(`${userProfile?.uid || 'guest'}_${todayKey}`);
+    return seededShuffle(activeQuestions, seed);
+  }, [activeQuestions, userProfile?.uid, todayKey]);
+
+  const todaysOSTQuestion = useMemo(() => {
+    return questions.find(q => q.isOST && q.active) || null;
   }, [questions]);
 
   const reviewQuestions = useMemo(() => {
@@ -292,10 +346,10 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const idx = reviewIndex % reviewQuestions.length;
       return reviewQuestions[idx];
     }
-    if (activeQuestions.length === 0) return null;
-    const index = currentQuestionIndex % activeQuestions.length;
-    return activeQuestions[index] || activeQuestions[0];
-  }, [isReviewMode, reviewQuestions, reviewIndex, activeQuestions, currentQuestionIndex]);
+    if (dailyShuffledQuestions.length === 0) return null;
+    const index = currentQuestionIndex % dailyShuffledQuestions.length;
+    return dailyShuffledQuestions[index] || dailyShuffledQuestions[0];
+  }, [isReviewMode, reviewQuestions, reviewIndex, dailyShuffledQuestions, currentQuestionIndex]);
 
   const isDailyLimitReached = useMemo(() => {
     return dailyActivity.questionsAnswered >= gameSettings.dailyQuestionLimit;
@@ -325,8 +379,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let masteryDelta = 0;
 
     if (isReviewMode) {
-      // Safe practice: never coins, never a mastery penalty for a miss --
-      // only reward genuinely fixing a previously-missed question.
       masteryDelta = isCorrect ? MASTERY_CORRECT_GAIN : 0;
     } else {
       const willHitCap = !practiceMode && isDailyLimitReached;
@@ -348,9 +400,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       recordQuestionOutcome({ coinsDelta: coinsAwarded, unitId, masteryDelta });
     }
 
-    // A question graduates out of the review queue the moment it's
-    // answered correctly (whether that happens in Review Mode or just by
-    // luck in the main flow); a miss in the main flow queues it up.
     if (isCorrect) {
       if (reviewQueueIds.includes(currentQuestion.questionId)) {
         saveReviewQueue(reviewQueueIds.filter(id => id !== currentQuestion.questionId));
@@ -397,6 +446,42 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     setLastResult(result);
     setHasAnsweredCurrent(true);
+    return result;
+  };
+
+  const submitOSTAnswer = (answerIndex: number): AnswerResult | null => {
+    if (!todaysOSTQuestion || dailyActivity.ostAnsweredToday) return null;
+
+    const isCorrect = answerIndex === todaysOSTQuestion.correctAnswer;
+    const coinsAwarded = isCorrect ? OST_CORRECT_REWARD : 0;
+
+    if (isCorrect) {
+      sounds.playCorrect();
+    } else {
+      sounds.playEffort();
+    }
+
+    if (coinsAwarded !== 0) {
+      recordQuestionOutcome({ coinsDelta: coinsAwarded });
+    }
+
+    const updatedActivity: DailyActivity = { ...dailyActivity, ostAnsweredToday: true };
+    setDailyActivity(updatedActivity);
+    try {
+      localStorage.setItem(activityStorageKey, JSON.stringify(updatedActivity));
+    } catch {}
+
+    const result: AnswerResult = {
+      isCorrect,
+      correctAnswerIndex: todaysOSTQuestion.correctAnswer,
+      explanation: todaysOSTQuestion.explanation,
+      coinsAwarded,
+      isDailyCapReached: false,
+      masteryDelta: 0,
+      isReviewMode: false
+    };
+
+    setLastOSTResult(result);
     return result;
   };
 
@@ -461,12 +546,14 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       questionsAnswered: 0,
       correctAnswers: 0,
       coinsEarned: 0,
-      lastQuestionAt: new Date().toISOString()
+      lastQuestionAt: new Date().toISOString(),
+      ostAnsweredToday: false
     };
     setDailyActivity(resetAct);
     setAnsweredQuestionIds([]);
     setHasAnsweredCurrent(false);
     setLastResult(null);
+    setLastOSTResult(null);
     setStreak(0);
     try {
       localStorage.removeItem(activityStorageKey);
@@ -499,7 +586,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         reviewQueueCount: reviewQuestions.length,
         isReviewMode,
         startReviewMode,
-        exitReviewMode
+        exitReviewMode,
+        todaysOSTQuestion,
+        hasAnsweredOST: !!dailyActivity.ostAnsweredToday,
+        lastOSTResult,
+        submitOSTAnswer
       }}
     >
       {children}

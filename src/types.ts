@@ -24,6 +24,7 @@ export interface DailyActivity {
   correctAnswers: number;
   coinsEarned: number;
   lastQuestionAt: string;
+  ostAnsweredToday?: boolean;
 }
 
 export interface Unit {
@@ -57,6 +58,7 @@ export interface Question {
   historicalEra: string;
   difficulty: 'easy' | 'medium' | 'hard';
   active: boolean;
+  isOST?: boolean;
 }
 
 export interface Card {

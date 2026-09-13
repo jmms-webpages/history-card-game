@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { getAvatarById } from '../data/avatars';
-import { isFirebaseConfigured, db, collection, getDocs } from '../firebase/config';
+import { isFirebaseConfigured, db, doc, getDoc } from '../firebase/config';
 import { Achievement } from '../types';
 import { sounds } from '../utils/audio';
 import { 
@@ -48,28 +48,33 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState<boolean>(true);
 
+  const [snapshotGeneratedAt, setSnapshotGeneratedAt] = useState<string | null>(null);
+
   const fetchLeaderboard = async () => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs) {
+    if (!isFirebaseConfigured || !db || !doc || !getDoc) {
       setLoadingEntries(false);
       return;
     }
     setLoadingEntries(true);
     try {
-      const coll = collection(db, 'leaderboard');
-      const snap = await getDocs(coll);
-      const list: LeaderboardEntry[] = snap.docs.map((d: any) => {
-        const data = d.data();
-        return {
-          uid: data.uid,
-          displayName: data.displayName,
-          avatar: data.avatar,
-          classroomCode: data.classroomCode,
-          coins: data.coins ?? 0,
-          uniqueCards: data.uniqueCardsCollected ?? 0,
-          totalCards: data.totalCardsCollected ?? 0
-        };
-      });
-      setEntries(list);
+      const snapshotRef = doc(db, 'leaderboard', 'snapshot');
+      const snap = await getDoc(snapshotRef);
+      if (snap && typeof snap.exists === 'function' && snap.exists()) {
+        const data = snap.data() as any;
+        const list: LeaderboardEntry[] = (data.entries || []).map((e: any) => ({
+          uid: e.uid,
+          displayName: e.displayName,
+          avatar: e.avatar,
+          classroomCode: e.classroomCode,
+          coins: e.coins ?? 0,
+          uniqueCards: e.uniqueCardsCollected ?? 0,
+          totalCards: e.totalCardsCollected ?? 0
+        }));
+        setEntries(list);
+        setSnapshotGeneratedAt(data.generatedAt || null);
+      } else {
+        setEntries([]);
+      }
     } catch (e) {
       console.warn('Leaderboard fetch notice:', e);
     } finally {
@@ -260,9 +265,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
       {activeTab === 'leaderboard' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+                        <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
               <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>Ranked by Card Binder Completion</span>
+              <span>
+                Ranked by Card Binder Completion
+                {snapshotGeneratedAt && (
+                  <span className="text-slate-500 font-normal"> · updated {new Date(snapshotGeneratedAt).toLocaleString()}</span>
+                )}
+              </span>
             </div>
             <button
               type="button"

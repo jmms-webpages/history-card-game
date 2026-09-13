@@ -133,14 +133,12 @@ allow create: if (isOwner(userId) || isAdmin()) &&
     // Public, safe-fields-only leaderboard entry per student. Deliberately
     // separate from /users/{userId} so classmates can see rankings without
     // ever being able to read each other's email address.
-    match /leaderboard/{uid} {
+    // A single pre-computed, admin-refreshed snapshot doc -- every student
+    // reads the SAME one document (1 read, regardless of class size)
+    // instead of querying every student's own entry.
+    match /leaderboard/{docId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAdmin() || (
-        isOwner(uid) &&
-        request.resource.data.uid == uid &&
-        !request.resource.data.keys().hasAny(['email'])
-      );
-      allow delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Content: Questions, Cards, Packs, Units, Standards

@@ -198,22 +198,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return updated;
   };
 
-  // Mirrors only the safe, public fields of a profile into /leaderboard/{uid}
-  // -- never the email address -- so classmates can see rankings without
-  // ever being able to read each other's full user document.
-  const syncLeaderboardEntry = (profile: UserProfile) => {
-    if (!isFirebaseConfigured || !db || !doc || !setDoc) return;
-    const entryRef = doc(db, 'leaderboard', profile.uid);
-    setDoc(entryRef, {
-      uid: profile.uid,
-      displayName: profile.displayName,
-      avatar: profile.avatar,
-      classroomCode: profile.classroomCode,
-      coins: profile.coins,
-      totalCardsCollected: profile.totalCardsCollected ?? 0,
-      uniqueCardsCollected: profile.uniqueCardsCollected ?? 0
-    }, { merge: true }).catch(e => console.warn('Leaderboard sync notice:', e));
-  };
 
   const checkAdminPrivilege = (profile: UserProfile | null, fbUser: FirebaseUser | null): boolean => {
     if (!profile) return false;
@@ -292,7 +276,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    syncLeaderboardEntry(combinedProfile);
     saveProfileLocally(combinedProfile);
     return combinedProfile;
   };
@@ -417,7 +400,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firestore profile update notice:', e);
       });
     }
-    syncLeaderboardEntry(updated);
   };
 
   // Bundles a coin change and a unit-mastery change into ONE Firestore
@@ -445,7 +427,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firestore question-outcome sync notice:', e);
       });
     }
-    syncLeaderboardEntry(updated);
   };
 
   const updateCoins = async (deltaCoins: number): Promise<number> => {
@@ -464,7 +445,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Firestore coins update notice:', e);
     });
   }
-  syncLeaderboardEntry(updated);
   return newCoins;
   };
 
