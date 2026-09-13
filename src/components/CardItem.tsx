@@ -12,6 +12,7 @@ interface CardItemProps {
   showDetails?: boolean;
   isRevealed?: boolean;
   isNew?: boolean;
+  isHolo?: boolean;
 }
 
 export const CardItem: React.FC<CardItemProps> = ({
@@ -22,7 +23,8 @@ export const CardItem: React.FC<CardItemProps> = ({
   size = 'md',
   showDetails = true,
   isRevealed = true,
-  isNew = false
+  isNew = false,
+  isHolo = false
 }) => {
   const colors = RARITY_COLORS[card.rarity] || RARITY_COLORS.Common;
   const isHighTier = ['Rare', 'Legendary', 'Mythical'].includes(card.rarity);
@@ -88,11 +90,34 @@ export const CardItem: React.FC<CardItemProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`group relative aspect-[5/7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-300 border-2 select-none overflow-hidden ${colors.bg} ${colors.border} ${colors.glow} hover:-translate-y-1 hover:shadow-2xl`}
+      className={`group relative aspect-[5/7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-300 border-2 select-none overflow-hidden ${colors.bg} ${
+        isHolo ? 'border-transparent shadow-[0_0_18px_rgba(232,121,249,0.35)]' : colors.border
+      } ${colors.glow} hover:-translate-y-1 hover:shadow-2xl`}
     >
       {/* Holographic / Foil Sheen for high-tier rarities */}
-      {isHighTier && (
+      {isHighTier && !isHolo && (
         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      )}
+
+      {/* Animated rainbow sheen for genuinely holographic pulls */}
+      {isHolo && (
+        <>
+          <style>{`
+            @keyframes holoSheenSweep {
+              0% { background-position: -150% 0; }
+              100% { background-position: 250% 0; }
+            }
+          `}</style>
+          <div
+            className="absolute inset-0 z-10 pointer-events-none opacity-70 mix-blend-overlay"
+            style={{
+              backgroundImage: 'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.9) 35%, rgba(244,114,182,0.65) 45%, rgba(56,189,248,0.65) 55%, rgba(255,255,255,0.9) 65%, transparent 80%)',
+              backgroundSize: '250% 100%',
+              animation: 'holoSheenSweep 3.5s linear infinite'
+            }}
+          />
+          <div className="absolute inset-0 z-0 rounded-2xl ring-1 ring-fuchsia-400/40 pointer-events-none" />
+        </>
       )}
 
       {/* NEW pull badge */}
@@ -120,12 +145,20 @@ export const CardItem: React.FC<CardItemProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 mt-1.5">
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${colors.badge} flex items-center gap-1`}>
             {card.rarity === 'Mythical' && <Sparkles className="w-2.5 h-2.5 text-purple-300" />}
             {card.rarity === 'Legendary' && <Sparkles className="w-2.5 h-2.5 text-amber-300" />}
             <span>{card.rarity}</span>
           </span>
+          {isHolo && (
+            <span
+              className="text-[10px] font-black px-2 py-0.5 rounded-full text-white shadow-sm tracking-wider"
+              style={{ backgroundImage: 'linear-gradient(90deg,#f472b6,#818cf8,#38bdf8)' }}
+            >
+              HOLO
+            </span>
+          )}
           <span className="text-[9px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-950/60 border border-slate-800">
             {card.standardId}
           </span>

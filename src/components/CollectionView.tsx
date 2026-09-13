@@ -29,6 +29,8 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
     inventory, 
     isCardOwned, 
     getCardCopies, 
+    hasHoloCopy,
+    getHoloCopies,
     stats, 
     sellAllDuplicates 
   } = useCards();
@@ -327,18 +329,29 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
           {filteredCards.map((card) => {
             const owned = isCardOwned(card.cardId);
             const copies = getCardCopies(card.cardId);
+            const ownsHolo = owned && hasHoloCopy(card.cardId);
 
             return (
-              <CardItem
-                key={card.cardId}
-                card={card}
-                isOwned={owned}
-                copiesCount={copies}
-                onClick={owned ? () => setSelectedCard(card) : () => {
-                  setToastMessage("This card slot is locked! Open booster packs to reveal and discover it.");
-                  setTimeout(() => setToastMessage(null), 3500);
-                }}
-              />
+              <React.Fragment key={card.cardId}>
+                <CardItem
+                  card={card}
+                  isOwned={owned}
+                  copiesCount={copies}
+                  onClick={owned ? () => setSelectedCard(card) : () => {
+                    setToastMessage("This card slot is locked! Open booster packs to reveal and discover it.");
+                    setTimeout(() => setToastMessage(null), 3500);
+                  }}
+                />
+                {ownsHolo && (
+                  <CardItem
+                    card={card}
+                    isOwned={true}
+                    isHolo={true}
+                    copiesCount={getHoloCopies(card.cardId)}
+                    onClick={() => setSelectedCard(card)}
+                  />
+                )}
+              </React.Fragment>
             );
           })}
         </div>

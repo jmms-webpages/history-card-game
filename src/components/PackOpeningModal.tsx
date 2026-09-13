@@ -142,6 +142,7 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
                   card={card}
                   isOwned={true}
                   isRevealed={isFlipped}
+                  isHolo={(card as any).isHolo}
                   onClick={() => handleFlipCard(idx)}
                 />
                 {/* Reveal Hint Button if not flipped */}

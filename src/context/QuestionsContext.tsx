@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import { Question, DailyActivity, GameSettings } from '../types';
 import { INITIAL_QUESTIONS } from '../data/questions';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
-import { useAuth } from './AuthContext';
+import { useAuth, MASTERY_CORRECT_GAIN, MASTERY_INCORRECT_PENALTY } from './AuthContext';
 import { sounds } from '../utils/audio';
 import {
   isFirebaseConfigured,
@@ -21,6 +21,8 @@ interface AnswerResult {
   explanation: string;
   coinsAwarded: number;
   isDailyCapReached: boolean;
+  masteryDelta: number;
+  isReviewMode: boolean;
 }
 
 interface QuestionsContextType {
@@ -43,6 +45,12 @@ interface QuestionsContextType {
   toggleQuestionActive: (questionId: string) => void;
   deleteQuestion: (questionId: string) => void;
   resetDailyActivity: () => void;
+  // Review Mode -- re-practice previously-missed questions, no coins,
+  // no daily-count impact, and mastery only ever goes up, never down.
+  reviewQueueCount: number;
+  isReviewMode: boolean;
+  startReviewMode: () => void;
+  exitReviewMode: () => void;
 }
 
 const QuestionsContext = createContext<QuestionsContextType | undefined>(undefined);
@@ -60,11 +68,6 @@ export const getTodayKey = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Merge Firestore question docs onto the bundled INITIAL_QUESTIONS. A doc
-// with a `questionText` field is a full custom question an admin created.
-// A doc with only `questionId`/`active` is a lightweight active/inactive
-// override for a bundled question -- this avoids re-uploading the whole
-// curriculum bank to Firestore just to flip one switch.
 const mergeRemoteQuestions = (base: Question[], remoteDocs: any[]): Question[] => {
   const byId = new Map<string, Question>();
   base.forEach(q => byId.set(q.questionId, q));
@@ -83,7 +86,7 @@ const mergeRemoteQuestions = (base: Question[], remoteDocs: any[]): Question[] =
 };
 
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userProfile, updateCoins } = useAuth();
+  const { userProfile, recordQuestionOutcome } = useAuth();
   const todayKey = useMemo(() => getTodayKey(), []);
 
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
@@ -102,8 +105,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
   };
 
-  // Game Settings -- cached locally for instant load, then reconciled with
-  // the shared Firestore doc so every admin's changes reach every student.
   const [gameSettings, setGameSettings] = useState<GameSettings>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
@@ -149,8 +150,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
-  // Questions bank -- cached locally for instant load, then reconciled with
-  // Firestore so questions any admin adds/retires reach the whole class.
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_QUESTIONS_KEY);
@@ -241,37 +240,100 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
+  // Personal "missed questions" queue -- local to this browser, like the
+  // daily counters above. A student re-practices these in Review Mode.
+  const reviewQueueKey = `ohio_review_queue_${userProfile?.uid || 'guest'}`;
+  const [reviewQueueIds, setReviewQueueIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(reviewQueueKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(reviewQueueKey);
+      setReviewQueueIds(saved ? JSON.parse(saved) : []);
+    } catch {
+      setReviewQueueIds([]);
+    }
+  }, [reviewQueueKey]);
+
+  const saveReviewQueue = (ids: string[]) => {
+    setReviewQueueIds(ids);
+    try {
+      localStorage.setItem(reviewQueueKey, JSON.stringify(ids));
+    } catch {}
+  };
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
+  const [reviewIndex, setReviewIndex] = useState<number>(0);
+  const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
   const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState<boolean>(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [streak, setStreak] = useState<number>(0);
   const [practiceMode, setPracticeMode] = useState<boolean>(false);
 
-  // Students no longer pick a unit -- the pool is simply every question an
-  // admin has marked active, pulled from across the whole curriculum.
   const activeQuestions = useMemo(() => {
     return questions.filter(q => q.active);
   }, [questions]);
 
+  const reviewQuestions = useMemo(() => {
+    return reviewQueueIds
+      .map(id => questions.find(q => q.questionId === id))
+      .filter((q): q is Question => !!q && q.active);
+  }, [reviewQueueIds, questions]);
+
   const currentQuestion = useMemo(() => {
+    if (isReviewMode) {
+      if (reviewQuestions.length === 0) return null;
+      const idx = reviewIndex % reviewQuestions.length;
+      return reviewQuestions[idx];
+    }
     if (activeQuestions.length === 0) return null;
     const index = currentQuestionIndex % activeQuestions.length;
     return activeQuestions[index] || activeQuestions[0];
-  }, [activeQuestions, currentQuestionIndex]);
+  }, [isReviewMode, reviewQuestions, reviewIndex, activeQuestions, currentQuestionIndex]);
 
   const isDailyLimitReached = useMemo(() => {
     return dailyActivity.questionsAnswered >= gameSettings.dailyQuestionLimit;
   }, [dailyActivity.questionsAnswered, gameSettings.dailyQuestionLimit]);
 
+  const startReviewMode = () => {
+    if (reviewQuestions.length === 0) return;
+    setIsReviewMode(true);
+    setReviewIndex(0);
+    setHasAnsweredCurrent(false);
+    setLastResult(null);
+  };
+
+  const exitReviewMode = () => {
+    setIsReviewMode(false);
+    setHasAnsweredCurrent(false);
+    setLastResult(null);
+  };
+
   const submitAnswer = (answerIndex: number): AnswerResult | null => {
     if (!currentQuestion || hasAnsweredCurrent) return null;
 
     const isCorrect = answerIndex === currentQuestion.correctAnswer;
-    const willHitCap = !practiceMode && isDailyLimitReached;
+    const unitId = currentQuestion.unitId;
 
     let coinsAwarded = 0;
-    if (!willHitCap) {
-      coinsAwarded = isCorrect ? gameSettings.correctCoinReward : gameSettings.incorrectCoinReward;
+    let masteryDelta = 0;
+
+    if (isReviewMode) {
+      // Safe practice: never coins, never a mastery penalty for a miss --
+      // only reward genuinely fixing a previously-missed question.
+      masteryDelta = isCorrect ? MASTERY_CORRECT_GAIN : 0;
+    } else {
+      const willHitCap = !practiceMode && isDailyLimitReached;
+      if (!willHitCap) {
+        coinsAwarded = isCorrect ? gameSettings.correctCoinReward : gameSettings.incorrectCoinReward;
+      }
+      masteryDelta = isCorrect ? MASTERY_CORRECT_GAIN : -MASTERY_INCORRECT_PENALTY;
     }
 
     if (isCorrect) {
@@ -282,36 +344,55 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setStreak(0);
     }
 
-    if (coinsAwarded > 0) {
-      updateCoins(coinsAwarded);
+    if (coinsAwarded !== 0 || masteryDelta !== 0) {
+      recordQuestionOutcome({ coinsDelta: coinsAwarded, unitId, masteryDelta });
     }
 
-    const now = new Date().toISOString();
-    const updatedActivity: DailyActivity = {
-      ...dailyActivity,
-      questionsAnswered: dailyActivity.questionsAnswered + (practiceMode ? 0 : 1),
-      correctAnswers: dailyActivity.correctAnswers + (isCorrect ? 1 : 0),
-      coinsEarned: dailyActivity.coinsEarned + coinsAwarded,
-      lastQuestionAt: now
-    };
+    // A question graduates out of the review queue the moment it's
+    // answered correctly (whether that happens in Review Mode or just by
+    // luck in the main flow); a miss in the main flow queues it up.
+    if (isCorrect) {
+      if (reviewQueueIds.includes(currentQuestion.questionId)) {
+        saveReviewQueue(reviewQueueIds.filter(id => id !== currentQuestion.questionId));
+      }
+    } else if (!isReviewMode && !reviewQueueIds.includes(currentQuestion.questionId)) {
+      saveReviewQueue([...reviewQueueIds, currentQuestion.questionId]);
+    }
 
-    setDailyActivity(updatedActivity);
-    try {
-      localStorage.setItem(activityStorageKey, JSON.stringify(updatedActivity));
-    } catch {}
+    let dailyCapReached = false;
+    if (!isReviewMode) {
+      const now = new Date().toISOString();
+      const updatedQuestionsAnswered = dailyActivity.questionsAnswered + (practiceMode ? 0 : 1);
+      const updatedActivity: DailyActivity = {
+        ...dailyActivity,
+        questionsAnswered: updatedQuestionsAnswered,
+        correctAnswers: dailyActivity.correctAnswers + (isCorrect ? 1 : 0),
+        coinsEarned: dailyActivity.coinsEarned + coinsAwarded,
+        lastQuestionAt: now
+      };
 
-    const newAnsweredIds = [...answeredQuestionIds, currentQuestion.questionId];
-    setAnsweredQuestionIds(newAnsweredIds);
-    try {
-      localStorage.setItem(answeredIdsKey, JSON.stringify(newAnsweredIds));
-    } catch {}
+      setDailyActivity(updatedActivity);
+      try {
+        localStorage.setItem(activityStorageKey, JSON.stringify(updatedActivity));
+      } catch {}
+
+      const newAnsweredIds = [...answeredQuestionIds, currentQuestion.questionId];
+      setAnsweredQuestionIds(newAnsweredIds);
+      try {
+        localStorage.setItem(answeredIdsKey, JSON.stringify(newAnsweredIds));
+      } catch {}
+
+      dailyCapReached = updatedQuestionsAnswered >= gameSettings.dailyQuestionLimit;
+    }
 
     const result: AnswerResult = {
       isCorrect,
       correctAnswerIndex: currentQuestion.correctAnswer,
       explanation: currentQuestion.explanation,
       coinsAwarded,
-      isDailyCapReached: updatedActivity.questionsAnswered >= gameSettings.dailyQuestionLimit
+      isDailyCapReached: dailyCapReached,
+      masteryDelta,
+      isReviewMode
     };
 
     setLastResult(result);
@@ -322,11 +403,13 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const nextQuestion = () => {
     setHasAnsweredCurrent(false);
     setLastResult(null);
-    setCurrentQuestionIndex(prev => prev + 1);
+    if (isReviewMode) {
+      setReviewIndex(prev => prev + 1);
+    } else {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
   };
 
-  // Question Management -- firestore.rules independently enforces that
-  // only an admin account can actually write to the 'questions' collection.
   const addQuestion = (newQ: Omit<Question, 'questionId'>) => {
     const questionId = `${CUSTOM_QUESTION_PREFIX}${Date.now()}`;
     const fullQuestion: Question = { ...newQ, questionId };
@@ -358,9 +441,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Bundled curriculum questions ship inside the app code itself, so they
-  // can only ever be hidden (toggled inactive), never truly deleted. Only
-  // admin-authored questions can be removed outright.
   const deleteQuestion = (questionId: string) => {
     if (!questionId.startsWith(CUSTOM_QUESTION_PREFIX)) {
       toggleQuestionActive(questionId);
@@ -415,7 +495,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addQuestion,
         toggleQuestionActive,
         deleteQuestion,
-        resetDailyActivity
+        resetDailyActivity,
+        reviewQueueCount: reviewQuestions.length,
+        isReviewMode,
+        startReviewMode,
+        exitReviewMode
       }}
     >
       {children}

@@ -5,6 +5,7 @@ import { useCards } from '../context/CardsContext';
 import { NavigationTab, Card } from '../types';
 import { getAvatarById } from '../data/avatars';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
+import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';
 import { 
@@ -291,6 +292,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      {/* Unit Mastery -- consistency-building tracker, private to this student */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-5 h-5 text-amber-400" />
+          <h2 className="text-lg font-bold text-slate-100">Unit Mastery</h2>
+        </div>
+        <p className="text-xs text-slate-400 mb-5">
+          Every correct answer builds mastery in that unit; a miss only costs half as much. Keep answering consistently to fill each bar.
+        </p>
+        <div className="space-y-4">
+          {INITIAL_UNITS.map((unit) => {
+            const points = userProfile.unitMastery?.[unit.unitId] || 0;
+            const percent = Math.min(100, Math.round((points / MASTERY_TARGET_POINTS) * 100));
+            const tierLabel =
+              percent >= 100 ? 'Mastered!' :
+              percent >= 90 ? 'Nearly Mastered' :
+              percent >= 60 ? 'Locked In' :
+              percent >= 25 ? 'Getting Consistent' :
+              'Building Foundations';
+            const tierColor =
+              percent >= 100 ? 'text-emerald-400' :
+              percent >= 60 ? 'text-amber-400' :
+              'text-slate-400';
+
+            return (
+              <div key={unit.unitId}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-bold text-slate-200">{unit.unitName}</span>
+                  <span className={`font-mono font-bold ${tierColor}`}>{tierLabel} · {percent}%</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      percent >= 100 ? 'bg-emerald-400' : 'bg-gradient-to-r from-amber-500 to-amber-400'
+                    }`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Curriculum Roadmap (Ohio 8th Grade Social Studies Units) */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">

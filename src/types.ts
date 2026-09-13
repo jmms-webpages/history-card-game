@@ -15,6 +15,7 @@ export interface UserProfile {
   totalCardsCollected?: number;
   uniqueCardsCollected?: number;
   claimedAchievements?: string[];
+  unitMastery?: Record<string, number>;
 }
 
 export interface DailyActivity {
@@ -91,6 +92,7 @@ export interface InventoryItem {
   cardId: string;
   obtainedAt: string;
   isDuplicate: boolean;
+  isHolo?: boolean;
   card?: Card;
 }
 

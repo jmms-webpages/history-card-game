@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+
+// Tunable at a glance if you ever want to change the pace. A correct
+// answer is worth twice as much as a miss costs, so mastery still climbs
+// even with an imperfect hit rate -- it rewards showing up consistently,
+// not answering everything right.
+export const MASTERY_TARGET_POINTS = 200;
+export const MASTERY_CORRECT_GAIN = 0.5;
+export const MASTERY_INCORRECT_PENALTY = 0.25;
 import {
   auth,
   googleProvider,
@@ -29,6 +37,7 @@ interface AuthContextType {
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => Promise<void>;
+  recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
 }
@@ -413,6 +422,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncLeaderboardEntry(updated);
   };
 
+  // Bundles a coin change and a unit-mastery change into ONE Firestore
+  // write -- this is what keeps mastery tracking from costing any extra
+  // reads/writes beyond what answering a question already spent.
+  const recordQuestionOutcome = async ({ coinsDelta, unitId, masteryDelta }: { coinsDelta: number; unitId?: string; masteryDelta?: number }) => {
+    const base = userProfileRef.current;
+    if (!base) return;
+
+    const newCoins = Math.max(0, (base.coins || 0) + coinsDelta);
+    const updates: Partial<UserProfile> = { coins: newCoins };
+
+    if (unitId && typeof masteryDelta === 'number' && masteryDelta !== 0) {
+      const currentPoints = base.unitMastery?.[unitId] || 0;
+      const clamped = Math.max(0, Math.min(MASTERY_TARGET_POINTS, currentPoints + masteryDelta));
+      updates.unitMastery = { ...(base.unitMastery || {}), [unitId]: clamped };
+    }
+
+    const updated = applyProfileUpdate(updates);
+    if (!updated) return;
+
+    try {
+      if (isFirebaseConfigured && db && doc && updated.uid) {
+        const userRef = doc(db, 'users', updated.uid);
+        await updateDoc(userRef, updates);
+      }
+    } catch (e) {
+      console.warn('Firestore question-outcome sync notice:', e);
+    }
+    syncLeaderboardEntry(updated);
+  };
+
   const updateCoins = async (deltaCoins: number): Promise<number> => {
     const base = userProfileRef.current;
     if (!base) return 0;
@@ -440,6 +479,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       error,
       isAdmin,
       isStudentViewMode,
+      recordQuestionOutcome,
       setStudentViewMode,
       toggleStudentViewMode,
       loginWithGoogle,

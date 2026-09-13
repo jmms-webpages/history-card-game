@@ -119,11 +119,12 @@ service cloud.firestore {
       // ID for a rare one after the fact without ever "drawing" it.
       match /inventory/{instanceId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create: if (isOwner(userId) || isAdmin()) &&
-          request.resource.data.keys().hasOnly(['instanceId', 'cardId', 'obtainedAt', 'isDuplicate']) &&
+allow create: if (isOwner(userId) || isAdmin()) &&
+          request.resource.data.keys().hasOnly(['instanceId', 'cardId', 'obtainedAt', 'isDuplicate', 'isHolo']) &&
           request.resource.data.instanceId is string &&
           request.resource.data.cardId is string &&
-          request.resource.data.isDuplicate is bool;
+          request.resource.data.isDuplicate is bool &&
+          (!request.resource.data.keys().hasAny(['isHolo']) || request.resource.data.isHolo is bool);
         allow delete: if isOwner(userId) || isAdmin();
         allow update: if isAdmin();
       }

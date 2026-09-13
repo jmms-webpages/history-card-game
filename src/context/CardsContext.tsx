@@ -6,8 +6,14 @@ import { useAuth } from './AuthContext';
 import { sounds } from '../utils/audio';
 import { isFirebaseConfigured, db, doc, getDocs, collection, setDoc, deleteDoc } from '../firebase/config';
 
+// 1-in-10 chance for a pulled Legendary/Mythical copy to be holographic.
+// Deliberately per-copy, not per-catalog-card, so the same card can exist
+// in a student's binder as both a normal and a holo copy.
+const HOLO_CHANCE = 0.1;
+const HOLO_ELIGIBLE_RARITIES: CardRarity[] = ['Legendary', 'Mythical'];
+
 interface OpenPackResult {
-  cards: Card[];
+  cards: (Card & { isHolo: boolean })[];
   newCardsCount: number;
   duplicateCardsCount: number;
   packName: string;
@@ -25,6 +31,8 @@ interface CardsContextType {
   getCardById: (cardId: string) => Card | undefined;
   isCardOwned: (cardId: string) => boolean;
   getCardCopies: (cardId: string) => number;
+  hasHoloCopy: (cardId: string) => boolean;
+  getHoloCopies: (cardId: string) => number;
   getPackCardPool: (pack: Pack) => Card[];
   stats: {
     totalCards: number;
@@ -48,7 +56,6 @@ const LOCAL_STORAGE_INVENTORY_PREFIX = 'history_card_quest_inv_';
 export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userProfile, updateCoins, updateUserProfile } = useAuth();
 
-  // Custom or loaded cards
   const [cards, setCards] = useState<Card[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_CARDS_KEY);
@@ -64,10 +71,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_CARDS;
   });
 
-  // Card catalog data (name/rarity/description/etc.) ships inside the app
-  // bundle -- only the `active` flag ever needs to travel between admins
-  // and students, so Firestore only stores lightweight {cardId, active}
-  // override docs rather than the whole curriculum.
   useEffect(() => {
     if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
     (async () => {
@@ -97,9 +100,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   }, []);
 
-  // Pack "open/closed" state (e.g. Unit 5 packs closed until the class
-  // reaches Unit 5). Packs themselves are static curriculum data, so only
-  // a lightweight {packId, active} override doc is stored in Firestore.
   const [packOverrides, setPackOverrides] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_PACKS_KEY);
@@ -246,8 +246,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
-    // Keep the profile's card-collection stats in sync -- these are what
-    // the Admin Console roster and the Honor Roll leaderboard read.
     const uniqueIds = new Set(newInv.map(i => i.cardId));
     if (updateUserProfile) {
       updateUserProfile({
@@ -284,12 +282,30 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return map;
   }, [inventory]);
 
+  const holoOwnershipMap = useMemo(() => {
+    const map = new Map<string, number>();
+    inventory.forEach(item => {
+      if (item.isHolo) {
+        map.set(item.cardId, (map.get(item.cardId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [inventory]);
+
   const isCardOwned = (cardId: string): boolean => {
     return (ownershipMap.get(cardId) || 0) > 0;
   };
 
   const getCardCopies = (cardId: string): number => {
     return ownershipMap.get(cardId) || 0;
+  };
+
+  const hasHoloCopy = (cardId: string): boolean => {
+    return (holoOwnershipMap.get(cardId) || 0) > 0;
+  };
+
+  const getHoloCopies = (cardId: string): number => {
+    return holoOwnershipMap.get(cardId) || 0;
   };
 
   const rollRarity = (weights: Record<CardRarity, number>): CardRarity => {
@@ -369,6 +385,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const now = new Date().toISOString();
     const newInventoryItems: InventoryItem[] = [];
     const currentOwnership = new Map<string, number>(ownershipMap);
+    const pulledHoloFlags: boolean[] = [];
 
     pulledCards.forEach((card, idx) => {
       const currentCount = currentOwnership.get(card.cardId) ?? 0;
@@ -380,12 +397,16 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       currentOwnership.set(card.cardId, currentCount + 1);
 
+      const isHolo = HOLO_ELIGIBLE_RARITIES.includes(card.rarity) && Math.random() < HOLO_CHANCE;
+      pulledHoloFlags.push(isHolo);
+
       const instanceId = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${idx}`;
       newInventoryItems.push({
         instanceId,
         cardId: card.cardId,
         obtainedAt: now,
-        isDuplicate
+        isDuplicate,
+        isHolo
       });
 
       if (isFirebaseConfigured && db && doc && setDoc && userProfile?.uid) {
@@ -394,7 +415,8 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           instanceId,
           cardId: card.cardId,
           obtainedAt: now,
-          isDuplicate
+          isDuplicate,
+          isHolo
         }).catch(() => {});
       }
     });
@@ -417,7 +439,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     return {
-      cards: pulledCards,
+      cards: pulledCards.map((c, idx) => ({ ...c, isHolo: pulledHoloFlags[idx] })),
       newCardsCount,
       duplicateCardsCount,
       packName: pack.name
@@ -578,6 +600,8 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       getCardById,
       isCardOwned,
       getCardCopies,
+      hasHoloCopy,
+      getHoloCopies,
       getPackCardPool,
       stats,
       addCustomCard,
