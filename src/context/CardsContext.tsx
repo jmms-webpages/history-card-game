@@ -55,6 +55,7 @@ const LOCAL_STORAGE_INVENTORY_PREFIX = 'history_card_quest_inv_';
 
 export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userProfile, updateCoins, updateUserProfile } = useAuth();
+  const inventoryRef = React.useRef<InventoryItem[]>([]);
 
   const [cards, setCards] = useState<Card[]>(() => {
     try {
@@ -201,6 +202,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         localInv = JSON.parse(saved);
+        inventoryRef.current = localInv;
         setInventory(localInv);
       }
     } catch {
@@ -215,6 +217,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const snap = await Promise.race([getDocs(invColl), timeout]) as any;
           if (snap && snap.docs && snap.docs.length > 0) {
             const firestoreItems: InventoryItem[] = snap.docs.map((d: any) => d.data() as InventoryItem);
+            inventoryRef.current = firestoreItems;
             setInventory(firestoreItems);
             try {
               localStorage.setItem(storageKey, JSON.stringify(firestoreItems));
@@ -235,6 +238,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [userProfile?.uid]);
 
   const saveInventory = (newInv: InventoryItem[]) => {
+    inventoryRef.current = newInv;
     setInventory(newInv);
     if (!userProfile?.uid) return;
 
@@ -384,7 +388,14 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let duplicateCardsCount = 0;
     const now = new Date().toISOString();
     const newInventoryItems: InventoryItem[] = [];
-    const currentOwnership = new Map<string, number>(ownershipMap);
+    // Read the freshest inventory possible (a ref, not the closed-over React
+    // state) so a near-simultaneous second pull can't silently overwrite
+    // this one's results.
+    const freshOwnership = new Map<string, number>();
+    inventoryRef.current.forEach(item => {
+      freshOwnership.set(item.cardId, (freshOwnership.get(item.cardId) || 0) + 1);
+    });
+    const currentOwnership = freshOwnership;
     const pulledHoloFlags: boolean[] = [];
 
     pulledCards.forEach((card, idx) => {
@@ -421,7 +432,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
-    const updatedInventory = [...inventory, ...newInventoryItems];
+    const updatedInventory = [...inventoryRef.current, ...newInventoryItems];
     saveInventory(updatedInventory);
 
     const hasMythical = pulledCards.some(c => c.rarity === 'Mythical');

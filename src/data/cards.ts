@@ -2185,7 +2185,7 @@ export const RARITY_COLORS = {
     border: 'border-purple-400/90',
     text: 'text-purple-200',
     badge: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border-purple-400/60',
-    glow: 'hover:shadow-purple-500/50 shadow-xl shadow-purple-500/25 ring-2 ring-purple-400/50 animate-pulse',
+    glow: 'hover:shadow-purple-500/50 shadow-xl shadow-purple-500/25 ring-2 ring-purple-400/50',
     sheen: 'from-purple-600 via-fuchsia-700 to-slate-950',
     accent: '#a855f7'
   }

@@ -411,13 +411,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = applyProfileUpdate(updates);
     if (!updated) return;
 
-    try {
-      if (isFirebaseConfigured && db && doc && updated.uid) {
-        const userRef = doc(db, 'users', updated.uid);
-        await updateDoc(userRef, updates);
-      }
-    } catch (e) {
-      console.warn('Firestore profile update notice:', e);
+    if (isFirebaseConfigured && db && doc) {
+      const userRef = doc(db, 'users', updated.uid);
+      updateDoc(userRef, updates).catch(e => {
+        console.warn('Firestore profile update notice:', e);
+      });
     }
     syncLeaderboardEntry(updated);
   };
@@ -441,13 +439,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = applyProfileUpdate(updates);
     if (!updated) return;
 
-    try {
-      if (isFirebaseConfigured && db && doc && updated.uid) {
-        const userRef = doc(db, 'users', updated.uid);
-        await updateDoc(userRef, updates);
-      }
-    } catch (e) {
-      console.warn('Firestore question-outcome sync notice:', e);
+    if (isFirebaseConfigured && db && doc) {
+      const userRef = doc(db, 'users', updated.uid);
+      updateDoc(userRef, updates).catch(e => {
+        console.warn('Firestore question-outcome sync notice:', e);
+      });
     }
     syncLeaderboardEntry(updated);
   };
@@ -459,16 +455,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = applyProfileUpdate({ coins: newCoins });
     if (!updated) return 0;
 
-    try {
-      if (isFirebaseConfigured && db && doc && updated.uid) {
-        const userRef = doc(db, 'users', updated.uid);
-        await updateDoc(userRef, { coins: newCoins });
-      }
-    } catch (e) {
+  // Fire this in the background rather than awaiting it -- gameplay (pack
+  // opens, question rewards) must never hang waiting on a slow or stalled
+  // network write. Local state is already updated above.
+  if (isFirebaseConfigured && db && doc) {
+    const userRef = doc(db, 'users', updated.uid);
+    updateDoc(userRef, { coins: newCoins }).catch(e => {
       console.warn('Firestore coins update notice:', e);
-    }
-    syncLeaderboardEntry(updated);
-    return newCoins;
+    });
+  }
+  syncLeaderboardEntry(updated);
+  return newCoins;
   };
 
   return (

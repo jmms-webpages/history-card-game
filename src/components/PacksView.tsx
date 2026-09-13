@@ -28,6 +28,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
   const userCoins = userProfile?.coins ?? 0;
 
   const handleOpenPack = async (pack: Pack) => {
+    if (openingPackId) return; // a pull is already in flight -- ignore extra clicks
     if (userCoins < pack.cost) {
       setErrorMessage(`You need ${pack.cost - userCoins} more coins to open this pack. Answer daily questions to earn coins!`);
       setTimeout(() => setErrorMessage(null), 4000);
@@ -541,6 +542,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
       {/* Active Pack Opening Ceremony Modal */}
       {activePackForModal && pulledCards.length === 5 && (
         <PackOpeningModal
+          key={pulledCards.map(c => c.cardId).join('-')}
           pack={activePackForModal}
           pulledCards={pulledCards}
           newCardsCount={newCardsCount}
@@ -549,6 +551,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
           onOpenAnother={handleOpenAnother}
           onGoToBinder={onNavigate ? () => onNavigate('collection') : undefined}
           userCoins={userCoins}
+          isOpeningAnother={!!openingPackId}
         />
       )}
     </div>

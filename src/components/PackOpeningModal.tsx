@@ -22,6 +22,7 @@ interface PackOpeningModalProps {
   onOpenAnother?: () => void;
   onGoToBinder?: () => void;
   userCoins: number;
+  isOpeningAnother?: boolean;
 }
 
 export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
@@ -32,7 +33,8 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
   onClose,
   onOpenAnother,
   onGoToBinder,
-  userCoins
+  userCoins,
+  isOpeningAnother = false
 }) => {
   // Track which cards are flipped (indices 0..4)
   const [flippedCards, setFlippedCards] = useState<boolean[]>([false, false, false, false, false]);
@@ -93,7 +95,8 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer border border-slate-800"
+            disabled={isOpeningAnother}
+            className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer border border-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>
@@ -193,17 +196,28 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
               <button
                 type="button"
                 onClick={onOpenAnother}
-                className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                disabled={isOpeningAnother}
+                className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-60 disabled:cursor-wait"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Open Another ({pack.cost} Coins)</span>
+                {isOpeningAnother ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <span>Ripping...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Open Another ({pack.cost} Coins)</span>
+                  </>
+                )}
               </button>
             )}
 
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              disabled={isOpeningAnother}
+              className="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Done
             </button>
