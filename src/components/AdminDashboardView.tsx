@@ -92,9 +92,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   // costs zero extra reads beyond what "Refresh" already does.
   const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false);
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
-  const [unitMasteryAverages, setUnitMasteryAverages] = useState
-    { unitId: string; unitName: string; avgPercent: number }[]
-  >([]);
+const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
 
   const refreshLeaderboardSnapshot = async () => {
     if (!isFirebaseConfigured || !db || !doc || !setDoc || students.length === 0) return;
