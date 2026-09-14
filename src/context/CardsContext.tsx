@@ -4,13 +4,14 @@ import { INITIAL_CARDS, INITIAL_PACKS } from '../data/cards';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 import { useAuth } from './AuthContext';
 import { sounds } from '../utils/audio';
-import { isFirebaseConfigured, db, doc, getDocs, collection, setDoc, deleteDoc } from '../firebase/config';
+import { isFirebaseConfigured, db, doc, getDoc, setDoc, collection, getDocs } from '../firebase/config';
 
-// 1-in-10 chance for a pulled Legendary/Mythical copy to be holographic.
-// Deliberately per-copy, not per-catalog-card, so the same card can exist
-// in a student's binder as both a normal and a holo copy.
 const HOLO_CHANCE = 0.1;
 const HOLO_ELIGIBLE_RARITIES: CardRarity[] = ['Legendary', 'Mythical'];
+// Matches the defensive cap in firestore.rules -- a generous ceiling, not
+// a realistic one (a very engaged student pulling 3 packs/day for a full
+// school year lands well under 3,000 cards).
+const MAX_INVENTORY_ITEMS = 5000;
 
 interface OpenPackResult {
   cards: (Card & { isHolo: boolean })[];
@@ -187,8 +188,12 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
 
+  // The entire card collection lives in ONE document now
+  // (users/{uid}/collection/binder) -- exactly 1 read per session load,
+  // regardless of how large the collection grows over the year.
   useEffect(() => {
     if (!userProfile?.uid) {
+      inventoryRef.current = [];
       setInventory([]);
       setLoadingInventory(false);
       return;
@@ -197,11 +202,10 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const uid = userProfile.uid;
     const storageKey = `${LOCAL_STORAGE_INVENTORY_PREFIX}${uid}`;
 
-    let localInv: InventoryItem[] = [];
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
-        localInv = JSON.parse(saved);
+        const localInv: InventoryItem[] = JSON.parse(saved);
         inventoryRef.current = localInv;
         setInventory(localInv);
       }
@@ -209,29 +213,29 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
-    if (isFirebaseConfigured && db && collection && getDocs) {
-      const fetchFirestoreInv = async () => {
+    if (isFirebaseConfigured && db && doc && getDoc) {
+      (async () => {
         try {
-          const invColl = collection(db, 'users', uid, 'inventory');
+          const binderRef = doc(db, 'users', uid, 'collection', 'binder');
           const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-          const snap = await Promise.race([getDocs(invColl), timeout]) as any;
-          if (snap && snap.docs && snap.docs.length > 0) {
-            const firestoreItems: InventoryItem[] = snap.docs.map((d: any) => d.data() as InventoryItem);
-            inventoryRef.current = firestoreItems;
-            setInventory(firestoreItems);
+          const snap = await Promise.race([getDoc(binderRef), timeout]) as any;
+          if (snap && typeof snap.exists === 'function' && snap.exists()) {
+            const data = snap.data() as any;
+            const items: InventoryItem[] = Array.isArray(data?.items) ? data.items : [];
+            inventoryRef.current = items;
+            setInventory(items);
             try {
-              localStorage.setItem(storageKey, JSON.stringify(firestoreItems));
+              localStorage.setItem(storageKey, JSON.stringify(items));
             } catch {
               // ignore
             }
           }
         } catch (e) {
-          console.warn("Async inventory fetch notice:", e);
+          console.warn('Binder fetch notice (using cached collection):', e);
         } finally {
           setLoadingInventory(false);
         }
-      };
-      fetchFirestoreInv();
+      })();
     } else {
       setLoadingInventory(false);
     }
@@ -248,6 +252,15 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem(storageKey, JSON.stringify(newInv));
     } catch {
       // ignore
+    }
+
+    // ONE write for the whole collection -- this replaces what used to be
+    // up to 5+ separate writes every time a pack was opened.
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      const binderRef = doc(db, 'users', uid, 'collection', 'binder');
+      setDoc(binderRef, { items: newInv.slice(0, MAX_INVENTORY_ITEMS) }).catch(e => {
+        console.warn('Binder sync notice:', e);
+      });
     }
 
     const uniqueIds = new Set(newInv.map(i => i.cardId));
@@ -388,9 +401,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let duplicateCardsCount = 0;
     const now = new Date().toISOString();
     const newInventoryItems: InventoryItem[] = [];
-    // Read the freshest inventory possible (a ref, not the closed-over React
-    // state) so a near-simultaneous second pull can't silently overwrite
-    // this one's results.
     const freshOwnership = new Map<string, number>();
     inventoryRef.current.forEach(item => {
       freshOwnership.set(item.cardId, (freshOwnership.get(item.cardId) || 0) + 1);
@@ -419,17 +429,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isDuplicate,
         isHolo
       });
-
-      if (isFirebaseConfigured && db && doc && setDoc && userProfile?.uid) {
-        const itemRef = doc(db, 'users', userProfile.uid, 'inventory', instanceId);
-        setDoc(itemRef, {
-          instanceId,
-          cardId: card.cardId,
-          obtainedAt: now,
-          isDuplicate,
-          isHolo
-        }).catch(() => {});
-      }
     });
 
     const updatedInventory = [...inventoryRef.current, ...newInventoryItems];
@@ -479,11 +478,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await updateCoins(sellValue);
     sounds.playCoin();
 
-    if (isFirebaseConfigured && db && doc && deleteDoc && userProfile?.uid) {
-      const itemRef = doc(db, 'users', userProfile.uid, 'inventory', instanceId);
-      deleteDoc(itemRef).catch(() => {});
-    }
-
     return sellValue;
   };
 
@@ -512,13 +506,6 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     saveInventory(keepItems);
     await updateCoins(totalCoins);
     sounds.playCoin();
-
-    if (isFirebaseConfigured && db && doc && deleteDoc && userProfile?.uid) {
-      sellItems.forEach(item => {
-        const itemRef = doc(db, 'users', userProfile.uid, 'inventory', item.instanceId);
-        deleteDoc(itemRef).catch(() => {});
-      });
-    }
 
     return {
       soldCount: sellItems.length,

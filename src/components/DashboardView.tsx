@@ -6,6 +6,7 @@ import { NavigationTab, Card } from '../types';
 import { getAvatarById } from '../data/avatars';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
+import { getTodayKey } from '../context/QuestionsContext';
 import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';
 import { 
@@ -32,7 +33,20 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { userProfile } = useAuth();
   const { dailyActivity, gameSettings } = useQuestions();
-  const { stats, inventoryCards, isCardOwned, getCardCopies } = useCards();
+  const { stats, inventoryCards, isCardOwned, getCardCopies, cards } = useCards();
+
+  // Same card for the whole class each day -- a deterministic pick from
+  // data already loaded, so this costs zero extra Firestore reads.
+  const spotlightCard = React.useMemo(() => {
+    const activeCards = cards.filter(c => c.active);
+    if (activeCards.length === 0) return null;
+    let h = 0;
+    const seedStr = getTodayKey();
+    for (let i = 0; i < seedStr.length; i++) {
+      h = (Math.imul(31, h) + seedStr.charCodeAt(i)) | 0;
+    }
+    return activeCards[Math.abs(h) % activeCards.length];
+  }, [cards]);
 
   const [inspectCard, setInspectCard] = useState<Card | null>(null);
 
@@ -289,6 +303,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 onClick={() => setInspectCard(item.card)}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Daily Spotlight Card -- pure flavor, gives a reason to check in
+          even after hitting today's question cap */}
+      {spotlightCard && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-bold text-slate-100">Today's Spotlight Card</h2>
+          </div>
+          <p className="text-xs text-slate-400 mb-5">
+            A different card is featured every day — {isCardOwned(spotlightCard.cardId) ? "you've already got this one in your binder!" : 'keep earning packs to track it down.'}
+          </p>
+          <div className="max-w-[220px]">
+            <CardItem
+              card={spotlightCard}
+              isOwned={isCardOwned(spotlightCard.cardId)}
+              copiesCount={getCardCopies(spotlightCard.cardId)}
+            />
           </div>
         </div>
       )}

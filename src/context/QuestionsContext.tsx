@@ -357,6 +357,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const startReviewMode = () => {
     if (reviewQuestions.length === 0) return;
+    // If they already answered today's current question but hadn't
+    // advanced past it yet, advance now -- otherwise it would sit waiting
+    // and reappear (as if unanswered) the moment they exit review mode.
+    if (hasAnsweredCurrent) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
     setIsReviewMode(true);
     setReviewIndex(0);
     setHasAnsweredCurrent(false);

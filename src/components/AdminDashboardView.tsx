@@ -4,7 +4,7 @@ import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
-import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc } from '../firebase/config';
+import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { 
   ShieldCheck, 
@@ -80,6 +80,27 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     if (isAdmin) fetchStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  const [promotingUid, setPromotingUid] = useState<string | null>(null);
+
+  const promoteToAdmin = async (student: UserProfile) => {
+    if (!isFirebaseConfigured || !db || !doc || !updateDoc) return;
+    const confirmed = window.confirm(
+      `Promote ${student.displayName} to admin?\n\nThey'll get full Admin Console access -- editing questions, cards, packs, economy settings, and every student's data. Only do this once you're ready to switch them over from testing as a student.`
+    );
+    if (!confirmed) return;
+    setPromotingUid(student.uid);
+    try {
+      const userRef = doc(db, 'users', student.uid);
+      await updateDoc(userRef, { role: 'admin' });
+      await fetchStudents();
+    } catch (e) {
+      console.warn('Promote to admin notice:', e);
+      window.alert('Could not promote this user -- check your connection and try again.');
+    } finally {
+      setPromotingUid(null);
+    }
+  };
 
   const filteredStudents = students.filter(s => {
     if (!studentSearch.trim()) return true;
@@ -477,6 +498,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                     <th className="py-3 px-4 text-center">Total Cards</th>
                     <th className="py-3 px-4 text-right">Coins</th>
                     <th className="py-3 px-4 text-right">Last Active</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -498,11 +520,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                       <td className="py-3 px-4 text-right text-slate-500 font-mono">
                         {s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : '—'}
                       </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => promoteToAdmin(s)}
+                          disabled={promotingUid === s.uid}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {promotingUid === s.uid ? 'Promoting...' : 'Promote to Admin'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {!loadingStudents && filteredStudents.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500">
+                      <td colSpan={8} className="py-8 text-center text-slate-500">
                         No students found yet — they'll appear here after their first sign-in.
                       </td>
                     </tr>

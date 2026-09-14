@@ -42,12 +42,11 @@ service cloud.firestore {
       return delta in [
         -100,  // standardPackCost
         10,    // correctCoinReward
-        3,     // incorrectCoinReward
-        5,     // duplicateSellValues.Common
-        15,    // duplicateSellValues.Uncommon
-        40,    // duplicateSellValues.Rare
-        150,   // duplicateSellValues.Legendary
-        500    // duplicateSellValues.Mythical
+        3,     // incorrectCoinReward / duplicateSellValues.Common
+        8,     // duplicateSellValues.Uncommon
+        15,    // duplicateSellValues.Rare
+        20,    // duplicateSellValues.Legendary / OST correct reward
+        50     // duplicateSellValues.Mythical
       ];
     }
 
@@ -113,20 +112,18 @@ service cloud.firestore {
         allow write: if isOwner(userId) || isAdmin();
       }
 
-      // Inventory subcollection. Items can be created (pack pull) or
-      // deleted (selling a duplicate) by their owner, but never silently
-      // rewritten in place -- that would let a client swap a common card's
-      // ID for a rare one after the fact without ever "drawing" it.
-      match /inventory/{instanceId} {
+      // Entire card collection as ONE document -- 1 read per session load
+      // regardless of collection size, instead of one read per card ever
+      // owned. Trade-off: rules can only check shape here, not prove
+      // append-only history the way the old per-card docs could -- treat
+      // this at the same trust level as the coin economy (client-trusted,
+      // with guardrails), not as airtight anti-cheat.
+      match /collection/{docId} {
         allow read: if isOwner(userId) || isAdmin();
-allow create: if (isOwner(userId) || isAdmin()) &&
-          request.resource.data.keys().hasOnly(['instanceId', 'cardId', 'obtainedAt', 'isDuplicate', 'isHolo']) &&
-          request.resource.data.instanceId is string &&
-          request.resource.data.cardId is string &&
-          request.resource.data.isDuplicate is bool &&
-          (!request.resource.data.keys().hasAny(['isHolo']) || request.resource.data.isHolo is bool);
-        allow delete: if isOwner(userId) || isAdmin();
-        allow update: if isAdmin();
+        allow write: if (isOwner(userId) || isAdmin()) &&
+          request.resource.data.keys().hasOnly(['items']) &&
+          request.resource.data.items is list &&
+          request.resource.data.items.size() < 5000;
       }
     }
 
