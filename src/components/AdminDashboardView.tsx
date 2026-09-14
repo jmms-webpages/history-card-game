@@ -92,7 +92,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   // costs zero extra reads beyond what "Refresh" already does.
   const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false);
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
-const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
+  const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
 
   const refreshLeaderboardSnapshot = async () => {
     if (!isFirebaseConfigured || !db || !doc || !setDoc || students.length === 0) return;
@@ -478,6 +478,7 @@ const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: s
                   <tr>
                     <th className="py-3 px-4">Student</th>
                     <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4 text-center">Accuracy</th>
                     <th className="py-3 px-4 text-center">Unique Cards</th>
                     <th className="py-3 px-4 text-center">Total Cards</th>
                     <th className="py-3 px-4 text-right">Coins</th>
@@ -489,6 +490,14 @@ const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: s
                     <tr key={s.uid} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4 font-bold text-slate-100">{s.displayName}</td>
                       <td className="py-3 px-4 text-slate-400 font-mono">{s.email}</td>
+                      <td className="py-3 px-4 text-center font-mono">
+                        {s.totalQuestionsAnsweredLifetime
+                          ? `${Math.round((s.totalCorrectAnswersLifetime || 0) / s.totalQuestionsAnsweredLifetime * 100)}%`
+                          : '—'}
+                        {s.totalQuestionsAnsweredLifetime ? (
+                          <span className="text-slate-500 text-[10px]"> ({s.totalQuestionsAnsweredLifetime})</span>
+                        ) : null}
+                      </td>
                       <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{s.uniqueCardsCollected ?? 0}</td>
                       <td className="py-3 px-4 text-center font-mono text-slate-300">{s.totalCardsCollected ?? 0}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-amber-300">{s.coins ?? 0}</td>

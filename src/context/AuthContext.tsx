@@ -37,7 +37,7 @@ interface AuthContextType {
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => Promise<void>;
-  recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number }) => Promise<void>;
+  recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
 }
@@ -405,7 +405,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Bundles a coin change and a unit-mastery change into ONE Firestore
   // write -- this is what keeps mastery tracking from costing any extra
   // reads/writes beyond what answering a question already spent.
-  const recordQuestionOutcome = async ({ coinsDelta, unitId, masteryDelta }: { coinsDelta: number; unitId?: string; masteryDelta?: number }) => {
+  const recordQuestionOutcome = async ({ coinsDelta, unitId, masteryDelta, isCorrect }: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => {
     const base = userProfileRef.current;
     if (!base) return;
 
@@ -416,6 +416,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const currentPoints = base.unitMastery?.[unitId] || 0;
       const clamped = Math.max(0, Math.min(MASTERY_TARGET_POINTS, currentPoints + masteryDelta));
       updates.unitMastery = { ...(base.unitMastery || {}), [unitId]: clamped };
+    }
+
+    if (typeof isCorrect === 'boolean') {
+      updates.totalQuestionsAnsweredLifetime = (base.totalQuestionsAnsweredLifetime || 0) + 1;
+      updates.totalCorrectAnswersLifetime = (base.totalCorrectAnswersLifetime || 0) + (isCorrect ? 1 : 0);
     }
 
     const updated = applyProfileUpdate(updates);

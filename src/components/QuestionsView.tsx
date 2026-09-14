@@ -207,10 +207,22 @@ export const QuestionsView: React.FC = () => {
 
           {hasAnsweredOST ? (
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+              {lastOSTResult ? (
+                lastOSTResult.isCorrect ? (
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                ) : (
+                  <XCircle className="w-6 h-6 text-rose-500 shrink-0" />
+                )
+              ) : (
+                <CheckCircle2 className="w-6 h-6 text-slate-500 shrink-0" />
+              )}
               <div>
-                <p className="text-sm font-bold text-slate-200">
-                  {lastOSTResult ? (lastOSTResult.isCorrect ? "Nice work — you've got today's covered." : "Attempted — come back tomorrow for a new one.") : "You've already answered today's OST question."}
+                <p className={`text-sm font-bold ${
+                  lastOSTResult ? (lastOSTResult.isCorrect ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-200'
+                }`}>
+                  {lastOSTResult
+                    ? (lastOSTResult.isCorrect ? 'Correct! You\'ve got today\'s covered.' : 'Not quite — that one was a miss. Come back tomorrow for a new one.')
+                    : "You've already answered today's OST question."}
                 </p>
                 {lastOSTResult && (
                   <p className="text-xs text-slate-400 mt-1">{lastOSTResult.explanation}</p>

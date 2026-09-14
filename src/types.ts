@@ -16,6 +16,8 @@ export interface UserProfile {
   uniqueCardsCollected?: number;
   claimedAchievements?: string[];
   unitMastery?: Record<string, number>;
+  totalQuestionsAnsweredLifetime?: number;
+  totalCorrectAnswersLifetime?: number;
 }
 
 export interface DailyActivity {

@@ -397,7 +397,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     if (coinsAwarded !== 0 || masteryDelta !== 0) {
-      recordQuestionOutcome({ coinsDelta: coinsAwarded, unitId, masteryDelta });
+      recordQuestionOutcome({
+        coinsDelta: coinsAwarded,
+        unitId,
+        masteryDelta,
+        isCorrect: isReviewMode ? undefined : isCorrect
+      });
     }
 
     if (isCorrect) {
