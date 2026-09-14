@@ -89,7 +89,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
   // Honor Roll snapshot -- deliberately NOT automatic. Rankings only change
   // when you click this, reusing the roster already loaded above so it
-  // costs zero extra reads beyond what "Refresh" already does.
+  // costs zero extra reads beyond what "Refresh Roster" already does.
   const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false);
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
   const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
@@ -216,12 +216,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     setNewExplanation('');
     setNewTopic('');
     setNewIsOST(false);
-    setShowAddModal(false);
-
-    setNewQText('');
-    setNewAnswers(['', '', '', '']);
-    setNewExplanation('');
-    setNewTopic('');
     setShowAddModal(false);
   };
 
@@ -508,7 +502,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   ))}
                   {!loadingStudents && filteredStudents.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                      <td colSpan={7} className="py-8 text-center text-slate-500">
                         No students found yet — they'll appear here after their first sign-in.
                       </td>
                     </tr>
@@ -993,7 +987,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 onChange={(e) => setDailyLimit(Number(e.target.value))}
                 className="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:border-amber-400 focus:outline-none"
               />
-              <p className="text-[11px] text-slate-500 mt-1">Default: 25 questions per day.</p>
+              <p className="text-[11px] text-slate-500 mt-1">Default: 20 questions per day.</p>
             </div>
 
             <div>
