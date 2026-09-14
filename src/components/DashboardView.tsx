@@ -7,8 +7,8 @@ import { getAvatarById } from '../data/avatars';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
-import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';
+import { RARITY_COLORS } from '../data/cards';
 import { 
   Coins, 
   HelpCircle, 
@@ -48,6 +48,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     return activeCards[Math.abs(h) % activeCards.length];
   }, [cards]);
 
+  const spotlightColors = spotlightCard ? RARITY_COLORS[spotlightCard.rarity] : null;
+
   const [inspectCard, setInspectCard] = useState<Card | null>(null);
 
   if (!userProfile) return null;
@@ -55,8 +57,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const currentAvatar = getAvatarById(userProfile.avatar);
   const dailyAnswered = dailyActivity?.questionsAnswered ?? 0;
   const dailyLimit = gameSettings?.dailyQuestionLimit ?? 10;
-
-  // Recent cards pulled (latest 5 inventory items)
   const recentPulls = [...inventoryCards].reverse().slice(0, 5);
 
   return (
@@ -184,146 +184,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Quick Action Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Action: Questions */}
-        <div 
-          onClick={() => onNavigate('questions')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
-            <HelpCircle className="w-5 h-5" />
-          </div>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-              Daily Trivia
-            </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Active
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Answer 8th Grade Ohio Social Studies trivia to earn classroom coins.
-          </p>
-        </div>
-
-        {/* Action: Packs */}
-        <div 
-          onClick={() => onNavigate('packs')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
-            <Package className="w-5 h-5" />
-          </div>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-              Card Pack Depot
-            </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Active
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Spend 100 coins to open 5-card historical packs with guaranteed rare slots.
-          </p>
-        </div>
-
-        {/* Action: Collection */}
-        <div 
-          onClick={() => onNavigate('collection')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-slate-950 transition-colors">
-            <Library className="w-5 h-5" />
-          </div>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
-              My Binder
-            </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Active
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Track cards, view historical significance, complete sets, and sell duplicates.
-          </p>
-        </div>
-
-        {/* Action: Leaderboard & Milestones */}
-        <div 
-          onClick={() => onNavigate('leaderboard')}
-          className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 shadow-lg group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
-            <Trophy className="w-5 h-5" />
-          </div>
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-              Honor Roll
-            </h3>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Rankings
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Classroom leaderboard, scholar standings, and historical achievement milestone rewards.
-          </p>
-        </div>
-
-      </div>
-
-      {/* Recent Cards Pulled (Real Inventory) */}
-      {recentPulls.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-400" />
-              <h3 className="font-serif font-black text-slate-100 text-lg">
-                Recent Card Discoveries
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('collection')}
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
-            >
-              <span>View All in Binder</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
-            {recentPulls.map((item) => (
-              <CardItem
-                key={item.instanceId}
-                card={item.card}
-                isOwned={true}
-                copiesCount={getCardCopies(item.cardId)}
-                onClick={() => setInspectCard(item.card)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Daily Spotlight Card -- pure flavor, gives a reason to check in
-          even after hitting today's question cap */}
-      {spotlightCard && (
+          even after hitting today's question cap. Full description shown,
+          horizontal layout: art on the left, everything to read on the right. */}
+      {spotlightCard && spotlightColors && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-slate-100">Today's Spotlight Card</h2>
           </div>
           <p className="text-xs text-slate-400 mb-5">
-            A different card is featured every day — {isCardOwned(spotlightCard.cardId) ? "you've already got this one in your binder!" : 'keep earning packs to track it down.'}
+            A different card is featured every day.
           </p>
-          <div className="max-w-[220px]">
-            <CardItem
-              card={spotlightCard}
-              isOwned={isCardOwned(spotlightCard.cardId)}
-              copiesCount={getCardCopies(spotlightCard.cardId)}
-            />
+
+          <div className="flex flex-col sm:flex-row gap-5 sm:gap-6">
+            <div
+              onClick={() => setInspectCard(spotlightCard)}
+              className={`w-full sm:w-52 h-44 sm:h-56 shrink-0 rounded-2xl bg-gradient-to-br ${spotlightColors.sheen} border ${spotlightColors.border} flex items-center justify-center text-7xl shadow-lg cursor-pointer transition-transform hover:scale-[1.02]`}
+            >
+              <span>{(spotlightCard as any).symbol || '📜'}</span>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${spotlightColors.badge}`}>
+                  {spotlightCard.rarity}
+                </span>
+                <span className="text-[11px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                  {spotlightCard.standardId}
+                </span>
+                <span className="text-[11px] text-slate-400">{spotlightCard.packTheme}</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-black font-serif text-slate-100">
+                {spotlightCard.name}
+              </h3>
+
+              <p className="text-sm text-slate-300 leading-relaxed mt-3">
+                {spotlightCard.description}
+              </p>
+
+              <div className="mt-4 pt-3 border-t border-slate-800/80">
+                {isCardOwned(spotlightCard.cardId) ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Already in your binder ({getCardCopies(spotlightCard.cardId)} {getCardCopies(spotlightCard.cardId) === 1 ? 'copy' : 'copies'})
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                    <Package className="w-4 h-4" />
+                    Not in your binder yet — keep earning packs to track it down!
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
