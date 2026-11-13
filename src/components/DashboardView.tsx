@@ -139,9 +139,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <h3 className="font-serif font-black text-slate-100 text-lg">
                   History Collection Binder
                 </h3>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Official Set
-                </span>
               </div>
               <p className="text-xs text-slate-400">
                 {stats.uniqueCards} of {stats.totalInSet} unique curriculum cards collected
@@ -209,9 +206,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${spotlightColors.badge}`}>
                   {spotlightCard.rarity}
-                </span>
-                <span className="text-[11px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                  {spotlightCard.standardId}
                 </span>
                 <span className="text-[11px] text-slate-400">{spotlightCard.packTheme}</span>
               </div>
@@ -295,12 +289,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               Ohio 8th Grade Social Studies Curriculum Units
             </h2>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Updated 2026 Standards Aligned
-          </span>
         </div>
         <p className="text-xs text-slate-400 mb-6">
-          Every question, card, and pack in History Card Quest maps directly to the classroom curriculum units:
+          Here's what you'll be studying this year:
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

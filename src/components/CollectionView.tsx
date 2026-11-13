@@ -239,7 +239,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search historical figures, documents, standards (e.g. OH-SS8-2026.4)..."
+              placeholder="Search cards by name, era, or topic..."
               className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-slate-200 text-xs rounded-xl pl-9 pr-4 py-2.5 focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -261,7 +261,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500 cursor-pointer font-sans"
             >
-              <option value="curriculum">Sort by Standard / Unit</option>
+              <option value="curriculum">Sort by Unit Order</option>
               <option value="rarity">Sort by Rarity (Highest First)</option>
               <option value="name">Sort by Name (A-Z)</option>
               <option value="copies">Sort by Owned Copies</option>

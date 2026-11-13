@@ -159,9 +159,6 @@ export const CardItem: React.FC<CardItemProps> = ({
               HOLO
             </span>
           )}
-          <span className="text-[9px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-950/60 border border-slate-800">
-            {card.standardId}
-          </span>
         </div>
       </div>
 
@@ -187,7 +184,6 @@ export const CardItem: React.FC<CardItemProps> = ({
 
         <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-800/80">
           <span className="truncate max-w-[120px]">{card.packTheme}</span>
-          <span className="font-mono text-amber-400 font-bold">Ohio SS8</span>
         </div>
       </div>
     </div>

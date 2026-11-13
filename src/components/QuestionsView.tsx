@@ -365,9 +365,6 @@ export const QuestionsView: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-amber-300 text-[11px] font-mono font-bold">
-              {currentQuestion.standardId}
-            </span>
             <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
               {currentQuestion.topic}
             </span>
@@ -475,14 +472,9 @@ export const QuestionsView: React.FC = () => {
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/90 text-xs sm:text-sm text-slate-300 leading-relaxed">
                 <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs mb-1.5">
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Historical Context & Standard Explanation</span>
+                  <span>Why This Is the Answer</span>
                 </div>
                 <p>{lastResult.explanation}</p>
-                {currentQuestion.standardDescription && (
-                  <p className="mt-2 text-[11px] text-slate-500 border-t border-slate-900 pt-2 font-mono">
-                    Standard: {currentQuestion.standardDescription}
-                  </p>
-                )}
               </div>
 
               <div className="flex items-center justify-end pt-2">

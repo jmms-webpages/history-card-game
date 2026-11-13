@@ -103,20 +103,6 @@ export const AuthView: React.FC = () => {
             </button>
           </div>
 
-          {/* District Domain & Privacy Information */}
-          <div className="pt-2 border-t border-slate-800/80 space-y-2.5 text-center text-xs text-slate-400 leading-relaxed">
-            <div className="flex items-center justify-center gap-1.5 text-amber-400 font-mono text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>@bearworks.jackson.sparcc.org &bull; @jackson.sparcc.org</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Display names are automatically assigned as <span className="font-semibold text-slate-200">First Name + Last Initial</span> (e.g. Maya P.) from your chosen Google account profile to safeguard student privacy.
-            </p>
-            <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-mono">
-              <GraduationCap className="w-3 h-3 text-slate-500" />
-              <span>Staff accounts automatically unlock teacher dashboard &amp; student view mode</span>
-            </div>
-          </div>
 
         </div>
 

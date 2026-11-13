@@ -82,9 +82,6 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                 {isHighTier && <Sparkles className="w-3 h-3" />}
                 {card.rarity}
               </span>
-              <span className="text-xs font-mono font-bold text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                {card.standardId}
-              </span>
               <span className="text-xs text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                 {card.packTheme}
               </span>
@@ -185,7 +182,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
         <div className="bg-slate-950/60 rounded-2xl p-5 border border-slate-800 space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
             <GraduationCap className="w-4 h-4" />
-            <span>Ohio Social Studies Curriculum Significance</span>
+            <span>Why It Matters</span>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
             {card.historicalSignificance}
@@ -193,8 +190,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-800 font-mono">
-          <span>Standard: {card.standardId}</span>
+        <div className="flex items-center justify-end text-xs text-slate-500 pt-2 border-t border-slate-800 font-mono">
           <button
             type="button"
             onClick={onClose}

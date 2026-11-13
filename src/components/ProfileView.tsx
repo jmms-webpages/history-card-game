@@ -89,10 +89,6 @@ export const ProfileView: React.FC = () => {
                 <span className="text-slate-500">Class:</span>
                 <span className="text-slate-200">{userProfile.classroomCode}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-slate-400 font-mono">
-                <span className="text-slate-500">Safe ID:</span>
-                <span className="text-slate-200">#{userProfile.uid.substring(0, 8)}</span>
-              </div>
             </div>
           </div>
 
@@ -146,7 +142,7 @@ export const ProfileView: React.FC = () => {
               <span>{userProfile.displayName}</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Your display name is set automatically from your school Google account and can't be changed here.
+              Set from your school Google account.
             </p>
           </div>
 
@@ -254,39 +250,6 @@ export const ProfileView: React.FC = () => {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Privacy Guarantee Panel */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-start gap-3">
-          <Shield className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-base font-bold text-slate-100">
-              Student Privacy & Classroom Safety
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              History Card Quest is built following strict student privacy standards:
-            </p>
-            <ul className="mt-3 space-y-2 text-xs text-slate-300">
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Your email address is confidential and is never displayed to other students.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>No public academic leaderboards or test scores are exposed. The game celebrates historical collecting and curiosity.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Only your display name, chosen historical avatar, and unique safe identifier ever appear on the classroom Honor Roll.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Your display name is generated automatically from your school account and can't be changed to something else.</span>
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
 
