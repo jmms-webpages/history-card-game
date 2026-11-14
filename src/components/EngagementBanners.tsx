@@ -5,6 +5,7 @@ import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { NavigationTab } from '../types';
+import { isUnassignedClass } from '../utils/classes';
 import { Snapshot, fetchSnapshot, getGoalProgress, GOAL_METRIC_LABELS } from '../utils/snapshot';
 
 // Shared goal the whole school works toward. Progress comes from the single
@@ -95,9 +96,7 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
 
   if (!userProfile) return null;
 
-  const periodCodes = gameSettings.periodCodes || [];
-  const needsPeriod =
-    periodCodes.length > 0 && !periodCodes.includes((userProfile.classroomCode || '').trim().toUpperCase());
+  const needsPeriod = (gameSettings.classes || []).length > 0 && isUnassignedClass(userProfile.classroomCode);
 
   const focusUnit = gameSettings.focusUnitId
     ? INITIAL_UNITS.find(u => u.unitId === gameSettings.focusUnitId)
@@ -130,14 +129,14 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
         <div className={`${bannerBase} bg-amber-500/10 border-amber-500/40`}>
           <div className="flex items-center gap-3 text-xs text-amber-200">
             <Users className="w-5 h-5 text-amber-400 shrink-0" />
-            <span><strong>Pick your class period</strong> so your points count for your class on the Honor Roll.</span>
+            <span><strong>Join your class</strong> with the password from your teacher so you can use the Class Binder and count on the Honor Roll.</span>
           </div>
           <button
             type="button"
             onClick={() => onNavigate('profile')}
             className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer whitespace-nowrap"
           >
-            Go to Profile
+            Join Class
           </button>
         </div>
       )}

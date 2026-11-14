@@ -3,8 +3,10 @@ import { Flame, Library, TrendingUp, Users } from 'lucide-react';
 import { getAvatarById } from '../data/avatars';
 import { Snapshot, WeeklyEntry } from '../utils/snapshot';
 import { ClassGoalCard } from './EngagementBanners';
+import { useQuestions } from '../context/QuestionsContext';
+import { classLabel } from '../utils/classes';
 
-type BoardView = 'week' | 'periods';
+type BoardView = 'week' | 'periods' | 'teachers';
 type PeriodMetric = 'mastery' | 'binder' | 'classBinder';
 
 const WeeklyList: React.FC<{
@@ -50,6 +52,8 @@ export const CompetitionBoards: React.FC<{ snapshot: Snapshot | null; currentUid
   currentUid,
   myPeriod
 }) => {
+  const { gameSettings } = useQuestions();
+  const classes = gameSettings.classes || [];
   const [view, setView] = useState<BoardView>('week');
   const [metric, setMetric] = useState<PeriodMetric>('mastery');
 
@@ -65,7 +69,7 @@ export const CompetitionBoards: React.FC<{ snapshot: Snapshot | null; currentUid
       <ClassGoalCard snapshot={snapshot} />
 
       <div className="flex gap-2">
-        {([['week', 'This Week'], ['periods', 'Class Periods']] as [BoardView, string][]).map(([id, label]) => (
+        {([['week', 'This Week'], ['periods', 'Classes'], ['teachers', 'Teacher Teams']] as [BoardView, string][]).map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -98,6 +102,39 @@ export const CompetitionBoards: React.FC<{ snapshot: Snapshot | null; currentUid
             <WeeklyList title="Most Improved Mastery" unit="pts" icon={<TrendingUp className="w-4 h-4 text-emerald-400" />} rows={snapshot.weekly.mastery} currentUid={currentUid} />
           </div>
         </>
+      )}
+
+      {snapshot && view === 'teachers' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-4 border-b border-slate-800 flex items-center gap-2 text-sm font-bold text-slate-100">
+            <Users className="w-4 h-4 text-amber-400" />
+            <span>Teacher Team Standings</span>
+          </div>
+          <p className="px-4 pt-3 text-[11px] text-slate-500">Average mastery across every period a teacher has.</p>
+          {(snapshot.teachers || []).length === 0 ? (
+            <p className="p-5 text-xs text-slate-500 text-center">No team data yet.</p>
+          ) : (
+            <ol className="divide-y divide-slate-800/60 mt-2">
+              {snapshot.teachers.map((t, i) => (
+                <li key={t.teacher} className="px-4 py-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 text-center font-mono font-bold text-slate-400">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                    </span>
+                    <span className="flex-1 font-bold text-slate-100">
+                      Team {t.teacher}
+                      <span className="ml-2 text-slate-500 font-normal">{t.students} students</span>
+                    </span>
+                    <span className="font-mono font-bold text-amber-300">{t.avgMasteryPct}%</span>
+                  </div>
+                  <div className="mt-1.5 ml-9 bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full" style={{ width: `${Math.min(100, t.avgMasteryPct)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       )}
 
       {snapshot && view === 'periods' && (
@@ -138,7 +175,7 @@ export const CompetitionBoards: React.FC<{ snapshot: Snapshot | null; currentUid
                         {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                       </span>
                       <span className="flex-1 font-bold text-slate-100">
-                        {p.code}
+                        {classLabel(classes, p.code)}
                         {isMine && <span className="ml-1.5 text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1 rounded font-mono">YOUR PERIOD</span>}
                         <span className="ml-2 text-slate-500 font-normal">{p.students} students</span>
                       </span>

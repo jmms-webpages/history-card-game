@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
 import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
+import { isUnassignedClass, classLabel } from '../utils/classes';
 import { User, Coins, Check, Save, Sparkles, Lock, LogOut, BadgeCheck, Award } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
@@ -10,15 +11,20 @@ export const ProfileView: React.FC = () => {
     userProfile, 
     updateUserProfile, 
     updateCoins, 
-    logout,  
+    logout,
+    joinClass,
     isAdmin, 
     isStudentViewMode, 
     toggleStudentViewMode 
   } = useAuth();
   const { gameSettings } = useQuestions();
+  const classes = gameSettings.classes || [];
   
   // Hooks must run on every render, so the null-guard comes AFTER them.
-  const [classroomCode, setClassroomCode] = useState(userProfile?.classroomCode ?? '');
+  const [joinCode, setJoinCode] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joining, setJoining] = useState(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile?.avatar ?? '');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -30,12 +36,28 @@ export const ProfileView: React.FC = () => {
     // automatically from the student's real Google account name and is
     // locked server-side (see firestore.rules) so it can never be spoofed.
     await updateUserProfile({
-      classroomCode: classroomCode.trim().toUpperCase(),
       avatar: selectedAvatarId
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setJoinError('');
+    setJoining(true);
+    try {
+      await joinClass(joinCode, joinPassword);
+      setJoinPassword('');
+    } catch (err: any) {
+      setJoinError(err?.message || 'Could not join that class.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const unassigned = isUnassignedClass(userProfile.classroomCode);
+  const teachers = Array.from(new Set(classes.map(c => c.teacher)));
 
   const handleClaimBonusCoins = async () => {
     await updateCoins(25);
@@ -78,7 +100,7 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5 text-slate-400 font-mono">
                 <span className="text-slate-500">Class:</span>
-                <span className="text-slate-200">{userProfile.classroomCode}</span>
+                <span className="text-slate-200">{unassigned ? 'Not joined yet' : classLabel(classes, userProfile.classroomCode)}</span>
               </div>
             </div>
           </div>
@@ -105,6 +127,47 @@ export const ProfileView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {unassigned && classes.length > 0 && !isAdmin && (
+        <form onSubmit={handleJoin} className="bg-slate-900 border border-amber-500/30 rounded-2xl p-6 sm:p-8 shadow-xl space-y-4">
+          <h2 className="text-lg font-bold text-slate-100">Join Your Class</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <select
+              required
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+            >
+              <option value="">Choose your class...</option>
+              {teachers.map(t => (
+                <optgroup key={t} label={t}>
+                  {classes.filter(c => c.teacher === t).map(c => (
+                    <option key={c.code} value={c.code}>{c.teacher} — {c.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <input
+              type="text"
+              required
+              value={joinPassword}
+              onChange={(e) => setJoinPassword(e.target.value)}
+              placeholder="Class password"
+              autoComplete="off"
+              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+            />
+          </div>
+          {joinError && <p className="text-xs text-rose-300">{joinError}</p>}
+          <button
+            type="submit"
+            disabled={joining}
+            className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm disabled:opacity-60 cursor-pointer"
+          >
+            {joining ? 'Joining...' : 'Join Class'}
+          </button>
+          <p className="text-[11px] text-slate-500">You can only join once. Ask your teacher if you pick the wrong one.</p>
+        </form>
+      )}
 
       {/* Edit Profile Form */}
       <form onSubmit={handleSave} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -139,34 +202,19 @@ export const ProfileView: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Classroom Code
+              Class
             </label>
-            {(gameSettings.periodCodes || []).length > 0 ? (
-              <select
-                required
-                value={classroomCode}
-                onChange={(e) => setClassroomCode(e.target.value.toUpperCase())}
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
-              >
-                {!(gameSettings.periodCodes || []).includes(classroomCode) && (
-                  <option value={classroomCode}>{classroomCode || 'Choose your period...'}</option>
-                )}
-                {(gameSettings.periodCodes || []).map(code => (
-                  <option key={code} value={code}>{code}</option>
-                ))}
-              </select>
+            {unassigned ? (
+              <div className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-amber-300 text-sm">
+                {classes.length > 0 ? 'Join your class below' : 'Your teacher is still setting up classes'}
+              </div>
             ) : (
-              <input
-                type="text"
-                required
-                value={classroomCode}
-                onChange={(e) => setClassroomCode(e.target.value.toUpperCase())}
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
-              />
+              <div className="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-300 text-sm flex items-center gap-2 cursor-not-allowed">
+                <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span>{classLabel(classes, userProfile.classroomCode)}</span>
+              </div>
             )}
-            <p className="text-[11px] text-slate-500 mt-1">
-              Your class period code.
-            </p>
+            {!unassigned && <p className="text-[11px] text-slate-500 mt-1">Wrong class? Ask your teacher to move you.</p>}
           </div>
         </div>
 

@@ -1,3 +1,4 @@
+import { hashClassPassword } from '../utils/classes';
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 // Tunable at a glance if you ever want to change the pace. A correct
@@ -39,6 +40,7 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements' | 'claimedGoalIds' | 'claimedClassMilestones' | 'claimedSubmissionIds' | 'classDonations'>>) => Promise<void>;
   recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
+  joinClass: (classCode: string, password: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -267,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid,
       displayName,
       avatar: existingData.avatar || (isAdminUser ? 'washington' : 'franklin'),
-      classroomCode: existingData.classroomCode || 'OHIO-8A',
+      classroomCode: existingData.classroomCode || '',
       role,
       coins: typeof existingData.coins === 'number' ? existingData.coins : (isAdminUser ? 1000 : 50),
       email: verifiedEmail,
@@ -411,6 +413,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Joining a class is checked by firestore.rules against the teacher-set
+  // password, so unlike other profile edits we WAIT for the server and only
+  // update the local profile if it accepted. A wrong password changes nothing.
+  const joinClass = async (classCode: string, password: string): Promise<void> => {
+    const base = userProfileRef.current;
+    if (!base) throw new Error('You need to be signed in.');
+    const code = classCode.trim().toUpperCase();
+    const proof = await hashClassPassword(code, password);
+    if (isFirebaseConfigured && db && doc) {
+      try {
+        await updateDoc(doc(db, 'users', base.uid), { classroomCode: code, joinProof: proof });
+      } catch (e: any) {
+        if (e?.code === 'permission-denied') {
+          throw new Error("That password isn't right for this class, or you've already joined one. Ask your teacher.");
+        }
+        throw new Error('Could not join right now. Please try again.');
+      }
+    }
+    applyProfileUpdate({ classroomCode: code, joinProof: proof });
+  };
+
   // Bundles a coin change and a unit-mastery change into ONE Firestore
   // write -- this is what keeps mastery tracking from costing any extra
   // reads/writes beyond what answering a question already spent.
@@ -477,6 +500,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loginWithSchoolEmail,
       logout,
       updateUserProfile,
+      joinClass,
       updateCoins,
       clearError: () => setError(null)
     }}>

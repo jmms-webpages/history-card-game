@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Users, Gift, CheckCircle2, Lock, RefreshCw, Heart, Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
+import { useQuestions } from '../context/QuestionsContext';
+import { isUnassignedClass, classLabel } from '../utils/classes';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { Card } from '../types';
 import {
@@ -19,9 +21,10 @@ const RARITY_TEXT: Record<string, string> = {
   Mythical: 'text-purple-400'
 };
 
-export const ClassBinderView: React.FC = () => {
+export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({ onNavigate }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
   const { cards, getCardCopies, donateDuplicate } = useCards();
+  const { gameSettings } = useQuestions();
 
   const [data, setData] = useState<ClassBinderData>({ cards: {} });
   const [loading, setLoading] = useState(true);
@@ -32,7 +35,7 @@ export const ClassBinderView: React.FC = () => {
   const classCode = (userProfile?.classroomCode || '').trim().toUpperCase();
 
   const load = async (force: boolean = false) => {
-    if (!classCode) {
+    if (isUnassignedClass(classCode)) {
       setLoading(false);
       return;
     }
@@ -104,6 +107,25 @@ export const ClassBinderView: React.FC = () => {
 
   const shownCards = unitFilter === 'all' ? activeCards : activeCards.filter(c => c.unitId === unitFilter);
 
+  if (isUnassignedClass(classCode)) {
+    return (
+      <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-3">
+        <Lock className="w-8 h-8 text-amber-400 mx-auto" />
+        <h1 className="text-xl font-black font-serif text-slate-100">Join your class first</h1>
+        <p className="text-sm text-slate-400">Enter your class password in your Profile to use the Class Binder.</p>
+        {onNavigate && (
+          <button
+            type="button"
+            onClick={() => onNavigate('profile')}
+            className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm cursor-pointer"
+          >
+            Go to Profile
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16 animate-fadeIn">
       {/* Header */}
@@ -112,7 +134,7 @@ export const ClassBinderView: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold mb-2">
               <Users className="w-3.5 h-3.5" />
-              <span>{classCode || 'No class period'}</span>
+              <span>{classLabel(gameSettings.classes || [], classCode)}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">Class Binder</h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl">

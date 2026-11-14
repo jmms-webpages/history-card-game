@@ -11,7 +11,6 @@ import { GOAL_METRIC_LABELS } from '../utils/snapshot';
 export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ students }) => {
   const { gameSettings, updateGameSettings } = useQuestions();
 
-  const [periodsText, setPeriodsText] = useState((gameSettings.periodCodes || []).join(', '));
   const [testLabel, setTestLabel] = useState(gameSettings.upcomingTest?.label || '');
   const [testDate, setTestDate] = useState(gameSettings.upcomingTest?.date || '');
 
@@ -39,14 +38,6 @@ export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ st
           : s.uniqueCardsCollected || 0),
       0
     );
-
-  const savePeriods = () => {
-    const codes = Array.from(
-      new Set(periodsText.split(',').map(c => c.trim().toUpperCase()).filter(Boolean))
-    );
-    updateGameSettings({ periodCodes: codes });
-    flash('Class periods saved.');
-  };
 
   const saveTest = () => {
     updateGameSettings({ upcomingTest: testLabel.trim() && testDate ? { label: testLabel.trim(), date: testDate } : null });
@@ -97,18 +88,6 @@ export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ st
           <CheckCircle2 className="w-4 h-4" /> {savedMsg}
         </div>
       )}
-
-      <div className={card}>
-        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Users className="w-4 h-4 text-amber-400" /> Class Periods</h3>
-        <p className="text-xs text-slate-400">
-          List your period codes, separated by commas (e.g. <span className="font-mono">1A, 2A, 3A</span>). Students then pick from a dropdown instead of typing, so period standings stay clean.
-          Leave blank to let students type their own.
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <input className={`${input} flex-1 min-w-[200px] font-mono`} value={periodsText} onChange={(e) => setPeriodsText(e.target.value)} placeholder="1A, 2A, 3A" />
-          <button type="button" className={btn} onClick={savePeriods}>Save Periods</button>
-        </div>
-      </div>
 
       <div className={card}>
         <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Target className="w-4 h-4 text-indigo-300" /> Class Goal</h3>
