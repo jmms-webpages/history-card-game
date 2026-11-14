@@ -1,18 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Library, 
-  Sparkles, 
-  Filter, 
-  Search, 
-  Coins, 
-  Trash2, 
-  Layers, 
-  Package, 
-  ArrowUpDown,
-  CheckCircle2,
-  ShieldCheck,
-  ChevronDown
-} from 'lucide-react';
+import { Library, Sparkles, Filter, Search, Coins, Package, ArrowUpDown, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useCards } from '../context/CardsContext';
 import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';

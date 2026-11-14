@@ -2,19 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
-import { 
-  User, 
-  Shield, 
-  Coins, 
-  Check, 
-  Save, 
-  Sparkles, 
-  Lock, 
-  LogOut, 
-  BookOpen, 
-  BadgeCheck,
-  Award
-} from 'lucide-react';
+import { User, Coins, Check, Save, Sparkles, Lock, LogOut, BadgeCheck, Award } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
   const { 
@@ -27,11 +15,12 @@ export const ProfileView: React.FC = () => {
     toggleStudentViewMode 
   } = useAuth();
   
-  if (!userProfile) return null;
-
-  const [classroomCode, setClassroomCode] = useState(userProfile.classroomCode);
-  const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile.avatar);
+  // Hooks must run on every render, so the null-guard comes AFTER them.
+  const [classroomCode, setClassroomCode] = useState(userProfile?.classroomCode ?? '');
+  const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile?.avatar ?? '');
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  if (!userProfile) return null;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +110,7 @@ export const ProfileView: React.FC = () => {
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-slate-100">
-              Customize Your Student Profile
+              Customize Your Profile
             </h2>
           </div>
           {savedSuccess && (
@@ -158,7 +147,7 @@ export const ProfileView: React.FC = () => {
               className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Your teacher's 8th Grade Social Studies period code.
+              Your class period code.
             </p>
           </div>
         </div>
@@ -166,7 +155,7 @@ export const ProfileView: React.FC = () => {
         {/* Historical Avatar Picker */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-            Select Your 8th Grade Historical Persona
+            Pick Your Historical Persona
           </label>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

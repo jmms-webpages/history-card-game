@@ -6,28 +6,7 @@ import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
 import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
-import { 
-  ShieldCheck, 
-  Settings, 
-  HelpCircle, 
-  BookOpen, 
-  Sliders, 
-  Plus, 
-  Check, 
-  Trash2, 
-  ToggleLeft, 
-  ToggleRight, 
-  Filter, 
-  Package, 
-  Eye, 
-  GraduationCap, 
-  Users, 
-  Award,
-  Sparkles,
-  Layers,
-  Search,
-  RefreshCw
-} from 'lucide-react';
+import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw } from 'lucide-react';
 
 interface AdminDashboardViewProps {
   onNavigate?: (tab: NavigationTab) => void;
@@ -245,7 +224,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       questionText: newQText.trim(),
       answers: newAnswers.map(a => a.trim()),
       correctAnswer: newCorrectIdx,
-      explanation: newExplanation.trim() || 'Curriculum concept verified by Ohio 8th Grade Social Studies administrator.',
+      explanation: newExplanation.trim() || 'Review your notes on this topic to learn more.',
       unitId: newUnitId,
       unitName: unitObj?.unitName || 'Custom Unit',
       standardId: newStandardId,

@@ -1,26 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Award, 
-  Coins, 
-  Flame, 
-  Volume2, 
-  VolumeX, 
-  RotateCcw, 
-  ArrowRight, 
-  Sparkles, 
-  BookOpen, 
-  Check, 
-  AlertCircle,
-  HelpCircle,
-  Trophy,
-  RefreshCcw,
-  GraduationCap,
-  ArrowLeftCircle
-} from 'lucide-react';
+import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
   const { userProfile, isAdmin } = useAuth();
@@ -82,7 +63,7 @@ export const QuestionsView: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasAnsweredCurrent, currentQuestion]);
+  }, [hasAnsweredCurrent, currentQuestion, submitAnswer, nextQuestion]);
 
   const handleSelectAnswer = (index: number) => {
     if (hasAnsweredCurrent) return;
@@ -542,7 +523,7 @@ export const QuestionsView: React.FC = () => {
               +{gameSettings?.correctCoinReward ?? 10} / +{gameSettings?.incorrectCoinReward ?? 3}
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              +10 for correct, +3 effort (never lost)
+              +{gameSettings?.correctCoinReward ?? 10} for correct, +{gameSettings?.incorrectCoinReward ?? 3} for effort (never lost)
             </p>
           </div>
 

@@ -2053,9 +2053,9 @@ export const INITIAL_CARDS: Card[] = [
 export const INITIAL_PACKS: Pack[] = [
   {
     packId: 'pack-all-star',
-    name: 'Grand Curriculum Booster',
-    description: 'Cards from all 8 curriculum eras (1492–1877). High excitement all-era pack with 126 total cards.',
-    theme: 'All Curriculum Eras',
+    name: 'Grand History Booster',
+    description: 'Cards from every era (1492–1877). The biggest pool of any pack.',
+    theme: 'All Eras',
     cost: 100,
     cardCount: 126,
     active: true,

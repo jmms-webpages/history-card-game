@@ -9,22 +9,7 @@ import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
 import { CardDetailModal } from './CardDetailModal';
 import { RARITY_COLORS } from '../data/cards';
-import { 
-  Coins, 
-  HelpCircle, 
-  Package, 
-  Library, 
-  CheckCircle2, 
-  Flame, 
-  BookOpen, 
-  Sparkles,
-  ArrowRight,
-  ShieldAlert,
-  Calendar,
-  Layers,
-  Award,
-  Trophy
-} from 'lucide-react';
+import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
 
 interface DashboardViewProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -119,8 +104,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-                <span>10 coins / correct</span>
-                <span className="text-amber-400 font-medium">{dailyLimit - dailyAnswered} left</span>
+                <span>{gameSettings?.correctCoinReward ?? 10} coins / correct</span>
+                <span className="text-amber-400 font-medium">{Math.max(0, dailyLimit - dailyAnswered)} left</span>
               </p>
             </div>
           </div>

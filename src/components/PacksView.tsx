@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Sparkles, Coins, Info, Check, ArrowRight, Zap, Trophy, Shield, Layers, Eye, X, Lock } from 'lucide-react';
+import { Package, Sparkles, Coins, Info, Check, Layers, Eye, X, Lock } from 'lucide-react';
 import { useCards } from '../context/CardsContext';
 import { useAuth } from '../context/AuthContext';
 import { PackOpeningModal } from './PackOpeningModal';
@@ -89,7 +89,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
               Historical Booster Packs
             </h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl leading-relaxed">
-              Open booster packs containing 5 cards per rip from pools of up to 126 cards. Each pack features 4 standard rolls plus 1 guaranteed Uncommon-or-better slot!
+              Open booster packs containing 5 cards per rip from pools of up to {Math.max(0, ...packs.map(p => p.cardCount))} cards. Each pack features 4 standard rolls plus 1 guaranteed Uncommon-or-better slot!
             </p>
           </div>
 

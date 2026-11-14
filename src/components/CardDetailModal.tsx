@@ -2,18 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '../types';
 import { RARITY_COLORS } from '../data/cards';
 import { useCards } from '../context/CardsContext';
-import { 
-  X, 
-  Sparkles, 
-  Coins, 
-  BookOpen, 
-  GraduationCap, 
-  ShieldCheck, 
-  Trash2,
-  Calendar,
-  Layers,
-  ArrowRight
-} from 'lucide-react';
+import { X, Sparkles, Coins, BookOpen, GraduationCap, Layers, ArrowRight } from 'lucide-react';
 
 interface CardDetailModalProps {
   card: Card | null;

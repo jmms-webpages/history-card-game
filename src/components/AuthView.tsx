@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, ShieldCheck, GraduationCap } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export const AuthView: React.FC = () => {
   const { loginWithGoogle, error, clearError, loading } = useAuth();

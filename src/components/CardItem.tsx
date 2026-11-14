@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../types';
 import { RARITY_COLORS } from '../data/cards';
-import { Sparkles, Lock, Shield, BookOpen } from 'lucide-react';
+import { Sparkles, Lock } from 'lucide-react';
 
 interface CardItemProps {
   card: Card;
