@@ -2,19 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
-import { 
-  User, 
-  Shield, 
-  Coins, 
-  Check, 
-  Save, 
-  Sparkles, 
-  Lock, 
-  LogOut, 
-  BookOpen, 
-  BadgeCheck,
-  Award
-} from 'lucide-react';
+import { User, Coins, Check, Save, Sparkles, Lock, LogOut, BadgeCheck, Award } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
   const { 
@@ -27,11 +15,12 @@ export const ProfileView: React.FC = () => {
     toggleStudentViewMode 
   } = useAuth();
   
-  if (!userProfile) return null;
-
-  const [classroomCode, setClassroomCode] = useState(userProfile.classroomCode);
-  const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile.avatar);
+  // Hooks must run on every render, so the null-guard comes AFTER them.
+  const [classroomCode, setClassroomCode] = useState(userProfile?.classroomCode ?? '');
+  const [selectedAvatarId, setSelectedAvatarId] = useState(userProfile?.avatar ?? '');
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  if (!userProfile) return null;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,10 +78,6 @@ export const ProfileView: React.FC = () => {
                 <span className="text-slate-500">Class:</span>
                 <span className="text-slate-200">{userProfile.classroomCode}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-slate-400 font-mono">
-                <span className="text-slate-500">Safe ID:</span>
-                <span className="text-slate-200">#{userProfile.uid.substring(0, 8)}</span>
-              </div>
             </div>
           </div>
 
@@ -125,7 +110,7 @@ export const ProfileView: React.FC = () => {
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-slate-100">
-              Customize Your Student Profile
+              Customize Your Profile
             </h2>
           </div>
           {savedSuccess && (
@@ -146,7 +131,7 @@ export const ProfileView: React.FC = () => {
               <span>{userProfile.displayName}</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Your display name is set automatically from your school Google account and can't be changed here.
+              Set from your school Google account.
             </p>
           </div>
 
@@ -162,7 +147,7 @@ export const ProfileView: React.FC = () => {
               className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Your teacher's 8th Grade Social Studies period code.
+              Your class period code.
             </p>
           </div>
         </div>
@@ -170,7 +155,7 @@ export const ProfileView: React.FC = () => {
         {/* Historical Avatar Picker */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-            Select Your 8th Grade Historical Persona
+            Pick Your Historical Persona
           </label>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -254,39 +239,6 @@ export const ProfileView: React.FC = () => {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Privacy Guarantee Panel */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-start gap-3">
-          <Shield className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-base font-bold text-slate-100">
-              Student Privacy & Classroom Safety
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              History Card Quest is built following strict student privacy standards:
-            </p>
-            <ul className="mt-3 space-y-2 text-xs text-slate-300">
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Your email address is confidential and is never displayed to other students.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>No public academic leaderboards or test scores are exposed. The game celebrates historical collecting and curiosity.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Only your display name, chosen historical avatar, and unique safe identifier ever appear on the classroom Honor Roll.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Your display name is generated automatically from your school account and can't be changed to something else.</span>
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
 

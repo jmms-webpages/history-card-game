@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Sparkles, Coins, Info, Check, ArrowRight, Zap, Trophy, Shield, Layers, Eye, X, Lock } from 'lucide-react';
+import { Package, Sparkles, Coins, Info, Check, Layers, Eye, X, Lock } from 'lucide-react';
 import { useCards } from '../context/CardsContext';
 import { useAuth } from '../context/AuthContext';
 import { PackOpeningModal } from './PackOpeningModal';
@@ -89,7 +89,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
               Historical Booster Packs
             </h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl leading-relaxed">
-              Open booster packs containing 5 cards per rip from pools of up to 126 authentic curriculum cards. Each pack features 4 standard rolls plus 1 guaranteed Uncommon-or-better slot!
+              Open booster packs containing 5 cards per rip from pools of up to {Math.max(0, ...packs.map(p => p.cardCount))} cards. Each pack features 4 standard rolls plus 1 guaranteed Uncommon-or-better slot!
             </p>
           </div>
 
@@ -436,7 +436,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
               <div className="flex items-center gap-2">
                 <Info className="w-5 h-5 text-amber-400" />
                 <h3 className="font-serif font-black text-slate-100 text-lg">
-                  Curriculum Drop Rates & Possible Cards
+                  Drop Rates & Possible Cards
                 </h3>
               </div>
               <button
@@ -449,13 +449,13 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
             </div>
 
             <p className="text-xs text-slate-300">
-              Each 5-card pack draws from specific historical curriculum pools using authentic booster roll algorithms:
+              Each 5-card pack draws from the cards in its unit:
             </p>
 
             {/* Pack Pools Breakdown */}
             <div className="bg-slate-950 rounded-2xl p-3 border border-slate-800 space-y-1.5 text-xs font-mono">
               <div className="text-amber-400 font-bold font-sans flex items-center justify-between border-b border-slate-800 pb-1.5">
-                <span>Curriculum Pack Pools</span>
+                <span>Pack Pools</span>
                 <span className="text-[10px] text-slate-400">Total Cards</span>
               </div>
               <div className="grid grid-cols-1 gap-1 text-[11px] text-slate-300 max-h-36 overflow-y-auto pr-1">

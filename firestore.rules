@@ -45,8 +45,11 @@ service cloud.firestore {
         3,     // incorrectCoinReward / duplicateSellValues.Common
         8,     // duplicateSellValues.Uncommon
         15,    // duplicateSellValues.Rare
-        20,    // duplicateSellValues.Legendary / OST correct reward
-        50     // duplicateSellValues.Mythical
+        20,    // duplicateSellValues.Legendary / OST correct reward / achievement
+        50,    // duplicateSellValues.Mythical / achievement
+        // Achievement rewards (data/achievements.ts) -- without these the
+        // coin write was rejected and the reward vanished on next login.
+        35, 45, 75, 100, 120, 150, 300
       ];
     }
 
@@ -95,7 +98,10 @@ service cloud.firestore {
       // isAllowedCoinDelta) -- this stops a single crafted write from
       // setting coins to an arbitrary number, even though it can't fully
       // verify the underlying gameplay action without a paid Functions plan.
-      allow update: if isAdmin() || (
+      // The owner branch is checked FIRST on purpose: isAdmin() does extra
+      // document lookups (each billed as a read), so evaluating it first
+      // would add reads to every single student write.
+      allow update: if (
         isOwner(userId) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'displayName', 'email']) &&
         (
@@ -103,7 +109,7 @@ service cloud.firestore {
           isAllowedCoinDelta(request.resource.data.coins - resource.data.coins)
         ) &&
         request.resource.data.coins >= 0
-      );
+      ) || isAdmin();
       allow delete: if isAdmin();
 
       // Daily activity subcollection

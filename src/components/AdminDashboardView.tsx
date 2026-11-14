@@ -6,28 +6,7 @@ import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
 import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
-import { 
-  ShieldCheck, 
-  Settings, 
-  HelpCircle, 
-  BookOpen, 
-  Sliders, 
-  Plus, 
-  Check, 
-  Trash2, 
-  ToggleLeft, 
-  ToggleRight, 
-  Filter, 
-  Package, 
-  Eye, 
-  GraduationCap, 
-  Users, 
-  Award,
-  Sparkles,
-  Layers,
-  Search,
-  RefreshCw
-} from 'lucide-react';
+import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw } from 'lucide-react';
 
 interface AdminDashboardViewProps {
   onNavigate?: (tab: NavigationTab) => void;
@@ -55,7 +34,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
   // Real classroom roster, pulled live from Firestore -- every account
   // that has ever signed in shows up here, not a hardcoded sample list.
-  const [students, setStudents] = useState<UserProfile[]>([]);
+  // The roster is one read PER student (~400), so it is cached locally and
+  // only re-fetched when you click "Refresh Roster" (or on the very first
+  // visit, when there's nothing cached yet).
+  const ROSTER_CACHE_KEY = 'hcq_admin_roster';
+  const [students, setStudents] = useState<UserProfile[]>(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || 'null');
+      return Array.isArray(cached) ? cached : [];
+    } catch {
+      return [];
+    }
+  });
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
   const [studentSearch, setStudentSearch] = useState<string>('');
 
@@ -69,6 +59,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       const list: UserProfile[] = snap.docs.map((d: any) => d.data() as UserProfile);
       list.sort((a, b) => a.displayName.localeCompare(b.displayName));
       setStudents(list);
+      try {
+        localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(list));
+      } catch {
+        // ignore
+      }
     } catch (e) {
       console.warn('Student roster fetch notice:', e);
     } finally {
@@ -77,7 +72,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   };
 
   useEffect(() => {
-    if (isAdmin) fetchStudents();
+    if (isAdmin && students.length === 0) fetchStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
@@ -93,7 +88,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     try {
       const userRef = doc(db, 'users', student.uid);
       await updateDoc(userRef, { role: 'admin' });
-      await fetchStudents();
+      // Update the local roster instead of re-reading every student.
+      setStudents(prev => {
+        const next = prev.filter(s => s.uid !== student.uid);
+        try {
+          localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
     } catch (e) {
       console.warn('Promote to admin notice:', e);
       window.alert('Could not promote this user -- check your connection and try again.');
@@ -220,7 +224,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       questionText: newQText.trim(),
       answers: newAnswers.map(a => a.trim()),
       correctAnswer: newCorrectIdx,
-      explanation: newExplanation.trim() || 'Curriculum concept verified by Ohio 8th Grade Social Studies administrator.',
+      explanation: newExplanation.trim() || 'Review your notes on this topic to learn more.',
       unitId: newUnitId,
       unitName: unitObj?.unitName || 'Custom Unit',
       standardId: newStandardId,

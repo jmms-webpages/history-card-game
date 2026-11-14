@@ -2,24 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavigationTab } from '../types';
 import { getAvatarById } from '../data/avatars';
-import { 
-  Compass, 
-  HelpCircle, 
-  Package, 
-  Library, 
-  User, 
-  GraduationCap, 
-  LogOut, 
-  Coins, 
-  Menu, 
-  X,
-  ShieldCheck,
-  Eye,
-  Trophy,
-  Settings,
-  Sparkles,
-  ChevronRight
-} from 'lucide-react';
+import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: NavigationTab;

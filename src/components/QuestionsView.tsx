@@ -1,26 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Award, 
-  Coins, 
-  Flame, 
-  Volume2, 
-  VolumeX, 
-  RotateCcw, 
-  ArrowRight, 
-  Sparkles, 
-  BookOpen, 
-  Check, 
-  AlertCircle,
-  HelpCircle,
-  Trophy,
-  RefreshCcw,
-  GraduationCap,
-  ArrowLeftCircle
-} from 'lucide-react';
+import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
   const { userProfile, isAdmin } = useAuth();
@@ -82,7 +63,7 @@ export const QuestionsView: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasAnsweredCurrent, currentQuestion]);
+  }, [hasAnsweredCurrent, currentQuestion, submitAnswer, nextQuestion]);
 
   const handleSelectAnswer = (index: number) => {
     if (hasAnsweredCurrent) return;
@@ -133,7 +114,7 @@ export const QuestionsView: React.FC = () => {
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
               {isReviewMode
                 ? 'Work back through questions you missed before — get it right and it graduates off this list for good.'
-                : 'Ohio 8th Grade Social Studies (1492–1877) • Earn coins to open card packs'}
+                : 'Answer questions, earn coins, and open card packs'}
             </p>
           </div>
 
@@ -365,9 +346,6 @@ export const QuestionsView: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-amber-300 text-[11px] font-mono font-bold">
-              {currentQuestion.standardId}
-            </span>
             <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
               {currentQuestion.topic}
             </span>
@@ -475,14 +453,9 @@ export const QuestionsView: React.FC = () => {
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/90 text-xs sm:text-sm text-slate-300 leading-relaxed">
                 <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs mb-1.5">
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Historical Context & Standard Explanation</span>
+                  <span>Why This Is the Answer</span>
                 </div>
                 <p>{lastResult.explanation}</p>
-                {currentQuestion.standardDescription && (
-                  <p className="mt-2 text-[11px] text-slate-500 border-t border-slate-900 pt-2 font-mono">
-                    Standard: {currentQuestion.standardDescription}
-                  </p>
-                )}
               </div>
 
               <div className="flex items-center justify-end pt-2">
@@ -550,7 +523,7 @@ export const QuestionsView: React.FC = () => {
               +{gameSettings?.correctCoinReward ?? 10} / +{gameSettings?.incorrectCoinReward ?? 3}
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              +10 for correct, +3 effort (never lost)
+              +{gameSettings?.correctCoinReward ?? 10} for correct, +{gameSettings?.incorrectCoinReward ?? 3} for effort (never lost)
             </p>
           </div>
 

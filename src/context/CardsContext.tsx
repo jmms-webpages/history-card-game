@@ -4,6 +4,7 @@ import { INITIAL_CARDS, INITIAL_PACKS } from '../data/cards';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 import { useAuth } from './AuthContext';
 import { sounds } from '../utils/audio';
+import { isFresh, markFetched } from '../utils/cache';
 import { isFirebaseConfigured, db, doc, getDoc, setDoc, collection, getDocs } from '../firebase/config';
 
 const HOLO_CHANCE = 0.1;
@@ -74,12 +75,14 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    // Skip the read entirely if we fetched the card toggles recently.
+    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('cards')) return;
     (async () => {
       try {
         const cardsColl = collection(db, 'cards');
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
         const snap = await Promise.race([getDocs(cardsColl), timeout]) as any;
+        if (snap && snap.docs) markFetched('cards');
         if (snap && snap.docs && snap.docs.length > 0) {
           const overrides = new Map<string, boolean>();
           snap.docs.forEach((d: any) => {
@@ -112,12 +115,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('packs')) return;
     (async () => {
       try {
         const packsColl = collection(db, 'packs');
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
         const snap = await Promise.race([getDocs(packsColl), timeout]) as any;
+        if (snap && snap.docs) markFetched('packs');
         if (snap && snap.docs && snap.docs.length > 0) {
           const overrides: Record<string, boolean> = {};
           snap.docs.forEach((d: any) => {
@@ -187,6 +191,15 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);
+  // True once the server has confirmed what's in this student's binder. Until
+  // then we refuse to modify it, because saving from an empty/stale local copy
+  // would overwrite their real collection.
+  const binderReadyRef = React.useRef<boolean>(false);
+  const assertBinderReady = () => {
+    if (isFirebaseConfigured && db && !binderReadyRef.current) {
+      throw new Error('Your collection is still syncing. Wait a moment and try again.');
+    }
+  };
 
   // The entire card collection lives in ONE document now
   // (users/{uid}/collection/binder) -- exactly 1 read per session load,
@@ -213,32 +226,44 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
+    let cancelled = false;
+    binderReadyRef.current = false;
+
     if (isFirebaseConfigured && db && doc && getDoc) {
-      (async () => {
-        try {
-          const binderRef = doc(db, 'users', uid, 'collection', 'binder');
-          const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-          const snap = await Promise.race([getDoc(binderRef), timeout]) as any;
-          if (snap && typeof snap.exists === 'function' && snap.exists()) {
-            const data = snap.data() as any;
-            const items: InventoryItem[] = Array.isArray(data?.items) ? data.items : [];
-            inventoryRef.current = items;
-            setInventory(items);
-            try {
-              localStorage.setItem(storageKey, JSON.stringify(items));
-            } catch {
-              // ignore
+      // Don't leave the UI spinning if the network is slow -- but keep waiting
+      // for the real answer in the background and apply it when it arrives.
+      const uiTimer = setTimeout(() => { if (!cancelled) setLoadingInventory(false); }, 2500);
+      const binderRef = doc(db, 'users', uid, 'collection', 'binder');
+      getDoc(binderRef)
+        .then((snap: any) => {
+          if (cancelled) return;
+          if (snap && typeof snap.exists === 'function') {
+            if (snap.exists()) {
+              const data = snap.data() as any;
+              const items: InventoryItem[] = Array.isArray(data?.items) ? data.items : [];
+              inventoryRef.current = items;
+              setInventory(items);
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(items));
+              } catch {
+                // ignore
+              }
             }
+            binderReadyRef.current = true;
           }
-        } catch (e) {
+        })
+        .catch((e: any) => {
           console.warn('Binder fetch notice (using cached collection):', e);
-        } finally {
-          setLoadingInventory(false);
-        }
-      })();
+        })
+        .finally(() => {
+          clearTimeout(uiTimer);
+          if (!cancelled) setLoadingInventory(false);
+        });
     } else {
       setLoadingInventory(false);
     }
+
+    return () => { cancelled = true; };
   }, [userProfile?.uid]);
 
   const saveInventory = (newInv: InventoryItem[]) => {
@@ -373,6 +398,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const openPack = async (packId: string): Promise<OpenPackResult> => {
     const pack = packs.find(p => p.packId === packId) || packs[0];
     const cost = pack.cost;
+    assertBinderReady();
 
     if (!pack.active) {
       throw new Error('This pack is currently locked by your teacher. Check back once your class reaches that unit!');
@@ -457,6 +483,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sellDuplicate = async (instanceId: string): Promise<number> => {
+    assertBinderReady();
     const itemIndex = inventory.findIndex(i => i.instanceId === instanceId);
     if (itemIndex === -1) return 0;
 
@@ -482,9 +509,11 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sellAllDuplicates = async (): Promise<{ soldCount: number; coinsEarned: number }> => {
+    assertBinderReady();
     const keepSet = new Set<string>();
     const keepItems: InventoryItem[] = [];
     const sellItems: InventoryItem[] = [];
+    const sellValues: number[] = [];
     let totalCoins = 0;
 
     for (const item of inventory) {
@@ -495,6 +524,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         sellItems.push(item);
         const card = cardMap.get(item.cardId);
         const value = card ? (DEFAULT_GAME_SETTINGS.duplicateSellValues[card.rarity] || 5) : 5;
+        sellValues.push(value);
         totalCoins += value;
       }
     }
@@ -504,7 +534,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     saveInventory(keepItems);
-    await updateCoins(totalCoins);
+    // One coin update per card sold: the Firestore rules only accept coin
+    // changes that match a single real reward amount, so a lump-sum total
+    // would be rejected and the coins would be lost on the next login.
+    // (Updates go out in order, so each one is checked against the last.)
+    for (const value of sellValues) {
+      await updateCoins(value);
+    }
     sounds.playCoin();
 
     return {

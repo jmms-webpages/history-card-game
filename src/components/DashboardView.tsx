@@ -9,22 +9,7 @@ import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
 import { CardDetailModal } from './CardDetailModal';
 import { RARITY_COLORS } from '../data/cards';
-import { 
-  Coins, 
-  HelpCircle, 
-  Package, 
-  Library, 
-  CheckCircle2, 
-  Flame, 
-  BookOpen, 
-  Sparkles,
-  ArrowRight,
-  ShieldAlert,
-  Calendar,
-  Layers,
-  Award,
-  Trophy
-} from 'lucide-react';
+import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
 
 interface DashboardViewProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -119,8 +104,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-                <span>10 coins / correct</span>
-                <span className="text-amber-400 font-medium">{dailyLimit - dailyAnswered} left</span>
+                <span>{gameSettings?.correctCoinReward ?? 10} coins / correct</span>
+                <span className="text-amber-400 font-medium">{Math.max(0, dailyLimit - dailyAnswered)} left</span>
               </p>
             </div>
           </div>
@@ -139,12 +124,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <h3 className="font-serif font-black text-slate-100 text-lg">
                   History Collection Binder
                 </h3>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Official Set
-                </span>
               </div>
               <p className="text-xs text-slate-400">
-                {stats.uniqueCards} of {stats.totalInSet} unique curriculum cards collected
+                {stats.uniqueCards} of {stats.totalInSet} unique cards collected
               </p>
             </div>
           </div>
@@ -178,7 +160,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             />
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-            <span>{stats.completionPercentage}% of Ohio 8th Grade Set Archived</span>
+            <span>{stats.completionPercentage}% of the set collected</span>
             <span>{stats.duplicatesCount} Duplicates Available to Sell</span>
           </div>
         </div>
@@ -209,9 +191,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${spotlightColors.badge}`}>
                   {spotlightCard.rarity}
-                </span>
-                <span className="text-[11px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                  {spotlightCard.standardId}
                 </span>
                 <span className="text-[11px] text-slate-400">{spotlightCard.packTheme}</span>
               </div>
@@ -292,15 +271,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-slate-100">
-              Ohio 8th Grade Social Studies Curriculum Units
+              Units
             </h2>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
-            Updated 2026 Standards Aligned
-          </span>
         </div>
         <p className="text-xs text-slate-400 mb-6">
-          Every question, card, and pack in History Card Quest maps directly to the classroom curriculum units:
+          Here's what you'll be studying this year:
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -2,16 +2,7 @@ import React, { useState } from 'react';
 import { Card, Pack } from '../types';
 import { CardItem } from './CardItem';
 import { sounds } from '../utils/audio';
-import { 
-  X, 
-  Sparkles, 
-  Package, 
-  Coins, 
-  ArrowRight, 
-  Check, 
-  RotateCcw,
-  Library
-} from 'lucide-react';
+import { X, Sparkles, Coins, RotateCcw, Library } from 'lucide-react';
 
 interface PackOpeningModalProps {
   pack: Pack;
@@ -114,7 +105,7 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
                   Pack Opening Complete!
                 </p>
                 <p className="text-[11px] text-slate-300">
-                  Unlocked <strong className="text-emerald-400">{newCardsCount} new {newCardsCount === 1 ? 'card' : 'cards'}</strong> for your binder, with <strong className="text-amber-400">{duplicateCardsCount} duplicates</strong> available to sell or trade.
+                  Unlocked <strong className="text-emerald-400">{newCardsCount} new {newCardsCount === 1 ? 'card' : 'cards'}</strong> for your binder, with <strong className="text-amber-400">{duplicateCardsCount} duplicates</strong> available to sell.
                 </p>
               </div>
             </div>

@@ -1,18 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Library, 
-  Sparkles, 
-  Filter, 
-  Search, 
-  Coins, 
-  Trash2, 
-  Layers, 
-  Package, 
-  ArrowUpDown,
-  CheckCircle2,
-  ShieldCheck,
-  ChevronDown
-} from 'lucide-react';
+import { Library, Sparkles, Filter, Search, Coins, Package, ArrowUpDown, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useCards } from '../context/CardsContext';
 import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';
@@ -141,13 +128,13 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold mb-2">
               <Library className="w-3.5 h-3.5" />
-              <span>Ohio 8th Grade Social Studies Archive</span>
+              <span>Your Collection</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">
               History Collection Binder
             </h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl">
-              Discover and archive key historical figures, seminal primary source documents, pivotal battles, and enduring artifacts from Ohio and United States history.
+              Collect key figures, documents, battles, and artifacts from Ohio and U.S. history.
             </p>
           </div>
 
@@ -239,7 +226,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search historical figures, documents, standards (e.g. OH-SS8-2026.4)..."
+              placeholder="Search cards by name, era, or topic..."
               className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-slate-200 text-xs rounded-xl pl-9 pr-4 py-2.5 focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -261,7 +248,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-500 cursor-pointer font-sans"
             >
-              <option value="curriculum">Sort by Standard / Unit</option>
+              <option value="curriculum">Sort by Unit Order</option>
               <option value="rarity">Sort by Rarity (Highest First)</option>
               <option value="name">Sort by Name (A-Z)</option>
               <option value="copies">Sort by Owned Copies</option>
@@ -393,7 +380,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
                 Your Binder is Ready for Its First Cards!
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Visit the Card Pack Depot to open booster packs and begin assembling Ohio 8th Grade Social Studies history.
+                Visit the Card Pack Depot to open booster packs and start building your collection.
               </p>
             </div>
           </div>

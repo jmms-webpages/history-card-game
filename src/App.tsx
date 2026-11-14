@@ -39,7 +39,7 @@ const MainAppContent: React.FC = () => {
           History Card Quest
         </p>
         <p className="text-xs text-slate-400 mt-1 font-mono">
-          Loading Ohio 8th Grade Social Studies Archive...
+          Loading...
         </p>
       </div>
     );
@@ -93,17 +93,6 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}
         </main>
 
-        {/* Classroom Safe Footer */}
-        <footer className="border-t border-slate-900 bg-slate-950/80 py-6 text-center text-xs text-slate-500 mt-auto">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p>
-              History Card Quest • Built for Ohio 8th Grade Social Studies (2026 Standards Transition)
-            </p>
-            <p className="text-[11px] font-mono text-slate-600">
-              Firebase Spark Architecture • Zero Student PII Exposed
-            </p>
-          </div>
-        </footer>
       </div>
     </div>
   );
