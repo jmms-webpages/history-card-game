@@ -65,9 +65,6 @@ export const PackOpeningModal: React.FC<PackOpeningModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pack.coverColor} flex items-center justify-center text-xl shadow`}>
-              📜
-            </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">

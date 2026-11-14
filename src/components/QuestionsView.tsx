@@ -71,6 +71,10 @@ export const QuestionsView: React.FC = () => {
     submitAnswer(index);
   };
 
+  // Focus-unit questions get a gold look so students know they pay a bonus.
+  const isFocusQuestion =
+    !isReviewMode && !!gameSettings?.focusUnitId && currentQuestion?.unitId === gameSettings.focusUnitId;
+
   const questionsAnswered = dailyActivity?.questionsAnswered ?? 0;
   const correctAnswers = dailyActivity?.correctAnswers ?? 0;
   const coinsEarned = dailyActivity?.coinsEarned ?? 0;
@@ -344,12 +348,16 @@ export const QuestionsView: React.FC = () => {
 
       {/* Main Question Card */}
       {currentQuestion ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className={`rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden border ${
+          isFocusQuestion
+            ? 'bg-gradient-to-br from-amber-950/70 via-slate-900 to-slate-900 border-amber-400/70 shadow-amber-500/20 ring-1 ring-amber-400/30'
+            : 'bg-slate-900 border-slate-800'
+        }`}>
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {!isReviewMode && gameSettings?.focusUnitId && currentQuestion.unitId === gameSettings.focusUnitId && (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold">
-                ⭐ Unit Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
+                ⭐ Bonus Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
               </span>
             )}
             <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
@@ -379,8 +387,10 @@ export const QuestionsView: React.FC = () => {
               const isSelected = selectedOption === index;
               const isCorrectAnswer = index === currentQuestion.correctAnswer;
               
-              let buttonStyle = "bg-slate-950 hover:bg-slate-800/80 border-slate-800 text-slate-200";
-              let badgeStyle = "bg-slate-800 text-slate-300";
+              let buttonStyle = isFocusQuestion
+                ? "bg-slate-950 hover:bg-amber-950/50 border-amber-500/30 text-slate-200"
+                : "bg-slate-950 hover:bg-slate-800/80 border-slate-800 text-slate-200";
+              let badgeStyle = isFocusQuestion ? "bg-amber-500/20 text-amber-300" : "bg-slate-800 text-slate-300";
 
               if (hasAnsweredCurrent) {
                 if (isCorrectAnswer) {

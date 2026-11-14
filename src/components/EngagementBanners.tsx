@@ -99,15 +99,23 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
     ? INITIAL_UNITS.find(u => u.unitId === gameSettings.focusUnitId)
     : null;
 
-  let testDays: number | null = null;
-  const test = gameSettings.upcomingTest;
-  if (test?.date) {
-    const target = new Date(`${test.date}T00:00:00`).getTime();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const days = Math.round((target - today.getTime()) / 86400000);
-    if (!Number.isNaN(days) && days >= 0 && days <= 21) testDays = days;
-  }
+  // Reminders for this student's class (or for every class), within 3 weeks.
+  const myCode = (userProfile.classroomCode || '').trim().toUpperCase();
+  const allTests = [
+    ...(gameSettings.upcomingTests || []),
+    ...(gameSettings.upcomingTest ? [gameSettings.upcomingTest] : [])
+  ];
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const upcoming = allTests
+    .filter(t => !t.classCodes || t.classCodes.length === 0 || t.classCodes.includes(myCode))
+    .map(t => ({
+      test: t,
+      days: Math.round((new Date(`${t.date}T00:00:00`).getTime() - todayStart.getTime()) / 86400000)
+    }))
+    .filter(x => !Number.isNaN(x.days) && x.days >= 0 && x.days <= 21)
+    .sort((x, y) => x.days - y.days)
+    .slice(0, 2);
 
   // "So close!" nudge: the started unit that needs the fewest more cards.
   const activeCards = cards.filter(c => c.active);
@@ -122,8 +130,8 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
 
   return (
     <div className="space-y-4">
-      {testDays !== null && test && (
-        <div className={`${bannerBase} bg-rose-500/10 border-rose-500/40`}>
+      {upcoming.map(({ test, days: testDays }) => (
+        <div key={test.id || `${test.label}-${test.date}`} className={`${bannerBase} bg-rose-500/10 border-rose-500/40`}>
           <div className="flex items-center gap-3 text-xs text-rose-100">
             <CalendarClock className="w-5 h-5 text-rose-300 shrink-0" />
             <span>
@@ -141,7 +149,7 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
             {reviewQueueCount > 0 ? 'Review Now' : 'Practice'} <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-      )}
+      ))}
 
       {focusUnit && (
         <div className={`${bannerBase} bg-amber-500/10 border-amber-500/40`}>

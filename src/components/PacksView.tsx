@@ -153,70 +153,38 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
             <div
               key={pack.packId}
               className={`bg-slate-900 border rounded-3xl p-5 shadow-lg flex flex-col justify-between transition-all duration-200 group relative overflow-hidden ${
-                pack.active ? 'border-slate-800 hover:border-slate-700 hover:-translate-y-1 hover:shadow-xl' : 'border-slate-800/60 opacity-70'
+                pack.active ? 'border-slate-800 hover:border-slate-700 hover:-translate-y-1 hover:shadow-xl' : 'border-slate-800/60'
               }`}
             >
-              {!pack.active && (
-                <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/90 border border-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider">
-                  <Lock className="w-3 h-3" />
-                  <span>Locked by Teacher</span>
-                </div>
-              )}
               {/* Booster Foil Art Wrapper */}
               <div>
                 <div
-                  className={`w-full aspect-[16/10] rounded-2xl bg-gradient-to-br ${pack.coverColor} p-4 flex flex-col justify-between relative overflow-hidden shadow-inner border border-white/10 group-hover:scale-[1.02] transition-transform duration-300`}
+                  className={`w-full aspect-[16/10] rounded-2xl bg-gradient-to-br ${pack.coverColor} p-4 flex flex-col relative overflow-hidden shadow-inner border border-white/10 transition-transform duration-300 ${
+                    pack.active ? 'group-hover:scale-[1.02]' : 'grayscale brightness-50'
+                  }`}
                 >
                   <PackCoverImage packId={pack.packId} />
-                  <div className="relative flex items-center justify-between text-white/90">
-                    <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/20 text-amber-300">
-                      Pulls 5 Cards
-                    </span>
-                    <span className="text-xs font-mono font-bold bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/20 text-white flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-300" />
-                      <span>{pack.cardCount} Possible Cards</span>
-                    </span>
-                  </div>
-
-                  <div className="relative text-center py-2">
-                    <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto text-2xl shadow-lg group-hover:rotate-6 transition-transform">
-                      📜
+                  {pack.active ? (
+                    <div className="relative flex-1 flex items-end justify-center">
+                      <h3 className="font-serif font-black text-white text-base drop-shadow-md line-clamp-1">
+                        {pack.name}
+                      </h3>
                     </div>
-                    <h3 className="font-serif font-black text-white text-base mt-2 drop-shadow-md line-clamp-1">
-                      {pack.name}
-                    </h3>
-                  </div>
-
-                  <div className="relative flex items-center justify-between text-[10px] text-white/80 font-mono">
-                    <span className="truncate max-w-[150px]">{pack.theme}</span>
-                    <span className="font-bold text-amber-300">1x Guaranteed Slot</span>
-                  </div>
+                  ) : (
+                    <div className="relative flex-1 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-full bg-slate-950/70 border border-slate-600 flex items-center justify-center">
+                        <Lock className="w-6 h-6 text-slate-300" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pack Meta */}
+                {pack.active && (
                 <div className="mt-4 space-y-2">
                   <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed font-sans">
                     {pack.description}
                   </p>
-
-                  {/* Real-time Collection & Card Pool Counter */}
-                  <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Possible Cards: <strong className="text-slate-200">{pack.cardCount}</strong></span>
-                      </span>
-                      <span className="text-amber-400 font-bold">
-                        {ownedCount}/{pack.cardCount} ({completionPct}%)
-                      </span>
-                    </div>
-
-                    <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, completionPct)}%` }}
-                      />
-                    </div>
 
                     <button
                       type="button"
@@ -227,10 +195,10 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                       className="w-full py-1 text-center text-[11px] text-amber-400 hover:text-amber-300 font-mono font-semibold hover:bg-slate-900 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>View {pack.cardCount} Possible Cards</span>
+                      <span>View Possible Cards</span>
                     </button>
-                  </div>
                 </div>
+                )}
               </div>
 
               {/* Bottom Cost and Action Button */}
@@ -269,9 +237,8 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                     )}
                   </button>
                 ) : (
-                  <span className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 bg-slate-950 border border-slate-800 text-slate-500">
+                  <span className="px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-500" aria-label="Locked">
                     <Lock className="w-4 h-4" />
-                    <span>Locked</span>
                   </span>
                 )}
               </div>
@@ -287,9 +254,6 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
             {/* Header */}
             <div className="flex items-start justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${selectedPackForChecklist.coverColor} flex items-center justify-center text-2xl shadow-lg border border-white/20`}>
-                  📜
-                </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
