@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
-import { NavigationTab, Question, UserProfile } from '../types';
+import { NavigationTab, AdminSubTab, Question, UserProfile } from '../types';
+import { classLabel } from '../utils/classes';
 import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { publishSnapshot } from '../utils/publishSnapshot';
@@ -14,9 +15,12 @@ import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Tras
 
 interface AdminDashboardViewProps {
   onNavigate?: (tab: NavigationTab) => void;
+  subTab: AdminSubTab;
+  onSubTabChange: (tab: AdminSubTab) => void;
+  onStudentCount?: (count: number) => void;
 }
 
-export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigate }) => {
+export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigate, subTab, onSubTabChange, onStudentCount }) => {
   const { userProfile, isAdmin, setStudentViewMode } = useAuth();
   const { 
     questions, 
@@ -34,7 +38,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     togglePackActive
   } = useCards();
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'students' | 'questions' | 'cards' | 'packs' | 'economy' | 'units' | 'standards' | 'engagement' | 'submissions' | 'classes'>('overview');
+  const activeSubTab = subTab;
+  const setActiveSubTab = onSubTabChange;
 
   // Real classroom roster, pulled live from Firestore -- every account
   // that has ever signed in shows up here, not a hardcoded sample list.
@@ -162,7 +167,25 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     }
   };
 
+  const [studentClassFilter, setStudentClassFilter] = useState<string>('all');
+  const classList = gameSettings.classes || [];
+  const classTeachers = Array.from(new Set(classList.map(c => c.teacher)));
+
+  // Lets the sidebar show the roster size without owning the roster.
+  useEffect(() => {
+    onStudentCount?.(students.length);
+  }, [students.length]);
+
   const filteredStudents = students.filter(s => {
+    const code = (s.classroomCode || '').trim().toUpperCase();
+    if (studentClassFilter === 'unassigned') {
+      if (classList.some(c => c.code === code)) return false;
+    } else if (studentClassFilter.startsWith('teacher:')) {
+      const t = studentClassFilter.slice(8);
+      if (!classList.some(c => c.teacher === t && c.code === code)) return false;
+    } else if (studentClassFilter !== 'all' && code !== studentClassFilter) {
+      return false;
+    }
     if (!studentSearch.trim()) return true;
     const term = studentSearch.toLowerCase();
     return s.displayName.toLowerCase().includes(term) || (s.email || '').toLowerCase().includes(term);
@@ -367,129 +390,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           </div>
         </div>
 
-        {/* Sub-navigation tabs */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-slate-800 text-xs font-medium">
-          <button
-            id="admin-subtab-overview"
-            type="button"
-            onClick={() => setActiveSubTab('overview')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              activeSubTab === 'overview' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            System Overview
-          </button>
-          <button
-            id="admin-subtab-students"
-            type="button"
-            onClick={() => setActiveSubTab('students')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'students' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Students ({students.length})</span>
-          </button>
-          <button
-            id="admin-subtab-questions"
-            type="button"
-            onClick={() => setActiveSubTab('questions')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'questions' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>Question Bank ({questions.length})</span>
-          </button>
-          <button
-            id="admin-subtab-cards"
-            type="button"
-            onClick={() => setActiveSubTab('cards')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'cards' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Package className="w-3.5 h-3.5" />
-            <span>Card Catalog & Rarity ({cards.length})</span>
-          </button>
-          <button
-            id="admin-subtab-packs"
-            type="button"
-            onClick={() => setActiveSubTab('packs')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'packs' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Package className="w-3.5 h-3.5" />
-            <span>Pack Availability</span>
-          </button>
-          <button
-            id="admin-subtab-economy"
-            type="button"
-            onClick={() => setActiveSubTab('economy')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'economy' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Classroom Economy & Daily Caps</span>
-          </button>
-          <button
-            id="admin-subtab-classes"
-            type="button"
-            onClick={() => setActiveSubTab('classes')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'classes' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Classes</span>
-          </button>
-          <button
-            id="admin-subtab-engagement"
-            type="button"
-            onClick={() => setActiveSubTab('engagement')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'engagement' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>Engagement &amp; Competition</span>
-          </button>
-          <button
-            id="admin-subtab-submissions"
-            type="button"
-            onClick={() => setActiveSubTab('submissions')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'submissions' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>Student Questions</span>
-          </button>
-          <button
-            id="admin-subtab-units"
-            type="button"
-            onClick={() => setActiveSubTab('units')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'units' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Curriculum Scope ({INITIAL_UNITS.length} Units)</span>
-          </button>
-          <button
-            id="admin-subtab-standards"
-            type="button"
-            onClick={() => setActiveSubTab('standards')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeSubTab === 'standards' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>Ohio 2026 Standards Matrix</span>
-          </button>
-        </div>
       </div>
 
       {activeSubTab === 'classes' && (
@@ -525,6 +425,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
               />
             </div>
+            <select
+              value={studentClassFilter}
+              onChange={(e) => setStudentClassFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+            >
+              <option value="all">All classes</option>
+              <option value="unassigned">No class yet</option>
+              {classTeachers.map(t => (
+                <optgroup key={t} label={t}>
+                  <option value={`teacher:${t}`}>All of {t}'s classes</option>
+                  {classList.filter(c => c.teacher === t).map(c => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
               <span className="text-xs text-slate-400 font-mono">{filteredStudents.length} of {students.length} students</span>
               <button
@@ -586,6 +502,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Student</th>
+                    <th className="py-3 px-4">Class</th>
                     <th className="py-3 px-4">Email</th>
                     <th className="py-3 px-4 text-center">Accuracy</th>
                     <th className="py-3 px-4 text-center">Unique Cards</th>
@@ -599,6 +516,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   {filteredStudents.map(s => (
                     <tr key={s.uid} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4 font-bold text-slate-100">{s.displayName}</td>
+                      <td className="py-3 px-4 text-slate-300">{classLabel(classList, s.classroomCode)}</td>
                       <td className="py-3 px-4 text-slate-400 font-mono">{s.email}</td>
                       <td className="py-3 px-4 text-center font-mono">
                         {s.totalQuestionsAnsweredLifetime
@@ -631,7 +549,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   ))}
                   {!loadingStudents && filteredStudents.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-500">
+                      <td colSpan={9} className="py-8 text-center text-slate-500">
                         No students found yet — they'll appear here after their first sign-in.
                       </td>
                     </tr>

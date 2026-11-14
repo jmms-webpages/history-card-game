@@ -208,3 +208,16 @@ export type NavigationTab =
   | 'profile'
   | 'admin'
   | 'student-view';
+
+export type AdminSubTab =
+  | 'overview'
+  | 'students'
+  | 'questions'
+  | 'cards'
+  | 'packs'
+  | 'economy'
+  | 'units'
+  | 'standards'
+  | 'engagement'
+  | 'submissions'
+  | 'classes';

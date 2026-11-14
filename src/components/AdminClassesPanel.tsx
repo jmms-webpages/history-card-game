@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Users, Plus, Trash2, KeyRound, RefreshCw, Search } from 'lucide-react';
+import { Users, Plus, Trash2, KeyRound, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { isFirebaseConfigured, db, doc, updateDoc } from '../firebase/config';
 import { useQuestions } from '../context/QuestionsContext';
 import { ClassInfo, UserProfile } from '../types';
@@ -30,6 +30,7 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, onStudentMoved })
   const [teacher, setTeacher] = useState('');
   const [periodsText, setPeriodsText] = useState('1, 2, 3, 4, 5, 6');
   const [studentSearch, setStudentSearch] = useState('');
+  const [openClass, setOpenClass] = useState<string | null>(null);
   const [moveTargets, setMoveTargets] = useState<Record<string, string>>({});
 
   // One read of the teacher-only passwords doc when this tab opens.
@@ -179,12 +180,14 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, onStudentMoved })
             <p className="text-[11px] uppercase tracking-wider font-mono text-slate-500 mb-1.5">{teacherName}</p>
             <div className="space-y-1.5">
               {list.map(cls => (
-                <div key={cls.code} className="flex flex-wrap items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
-                  <div className="min-w-0">
+                <div key={cls.code} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button type="button" onClick={() => setOpenClass(openClass === cls.code ? null : cls.code)} className="min-w-0 text-left cursor-pointer flex items-center gap-1.5" title="Show students">
+                    {openClass === cls.code ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
                     <span className="font-bold text-slate-100">{cls.name}</span>
                     <span className="ml-2 font-mono text-slate-500">{cls.code}</span>
                     <span className="ml-2 text-slate-500">{studentCounts[cls.code] || 0} students</span>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-amber-300 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
                       {keys.passwords[cls.code] || '—'}
@@ -196,6 +199,21 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, onStudentMoved })
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                </div>
+                {openClass === cls.code && (
+                  <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
+                    {students
+                      .filter(s => (s.classroomCode || '').trim().toUpperCase() === cls.code)
+                      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                      .map(s => (
+                        <div key={s.uid} className="flex items-center justify-between text-[11px] text-slate-300">
+                          <span>{s.displayName}</span>
+                          <span className="font-mono text-slate-500">{s.uniqueCardsCollected ?? 0} cards · {s.coins ?? 0} coins</span>
+                        </div>
+                      ))}
+                    {(studentCounts[cls.code] || 0) === 0 && <p className="text-[11px] text-slate-500">No students in this class yet.</p>}
+                  </div>
+                )}
                 </div>
               ))}
             </div>

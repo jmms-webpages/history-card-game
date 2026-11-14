@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QuestionsProvider } from './context/QuestionsContext';
 import { CardsProvider } from './context/CardsContext';
-import { NavigationTab } from './types';
+import { NavigationTab, AdminSubTab } from './types';
 import { Sidebar } from './components/Sidebar';
 import { AuthView } from './components/AuthView';
 import { DashboardView } from './components/DashboardView';
@@ -26,6 +26,8 @@ import { Eye } from 'lucide-react';
 const MainAppContent: React.FC = () => {
   const { userProfile, loading, isStudentViewMode, setStudentViewMode, isAdmin } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
+  const [adminTab, setAdminTab] = useState<AdminSubTab>('overview');
+  const [studentCount, setStudentCount] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
 
   React.useEffect(() => {
@@ -58,10 +60,20 @@ const MainAppContent: React.FC = () => {
     return <SetupView />;
   }
 
+  // Teachers see the admin console; Student View shows the student screens.
+  const showAdmin = isAdmin && !isStudentViewMode;
+  const tab: NavigationTab = showAdmin ? 'admin' : currentTab === 'admin' ? 'dashboard' : currentTab;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row selection:bg-amber-500 selection:text-slate-950">
       {/* Left-Side Navigation Bar */}
-      <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
+      <Sidebar
+        currentTab={tab}
+        onSelectTab={setCurrentTab}
+        adminTab={adminTab}
+        onSelectAdminTab={setAdminTab}
+        studentCount={studentCount}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
@@ -81,7 +93,6 @@ const MainAppContent: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setStudentViewMode(false);
-                    setCurrentTab('admin');
                   }}
                   className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 font-bold rounded-lg text-xs transition-colors cursor-pointer"
                 >
@@ -93,15 +104,22 @@ const MainAppContent: React.FC = () => {
         )}
 
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {(currentTab === 'dashboard' || currentTab === 'student-view') && <DashboardView onNavigate={setCurrentTab} />}
-          {currentTab === 'questions' && <QuestionsView />}
-          {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
-          {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
-          {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
-          {currentTab === 'classbinder' && <ClassBinderView onNavigate={setCurrentTab} />}
-          {currentTab === 'contribute' && <ContributeView />}
-          {currentTab === 'profile' && <ProfileView />}
-          {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}
+          {(tab === 'dashboard' || tab === 'student-view') && <DashboardView onNavigate={setCurrentTab} />}
+          {tab === 'questions' && <QuestionsView />}
+          {tab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
+          {tab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
+          {tab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
+          {tab === 'classbinder' && <ClassBinderView onNavigate={setCurrentTab} />}
+          {tab === 'contribute' && <ContributeView />}
+          {tab === 'profile' && <ProfileView />}
+          {tab === 'admin' && (
+            <AdminDashboardView
+              onNavigate={setCurrentTab}
+              subTab={adminTab}
+              onSubTabChange={setAdminTab}
+              onStudentCount={setStudentCount}
+            />
+          )}
         </main>
 
       </div>
