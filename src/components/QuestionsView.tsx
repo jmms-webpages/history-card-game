@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
-  const { userProfile, isAdmin } = useAuth();
+  const { userProfile, isAdmin, isStudentViewMode } = useAuth();
   const {
     currentQuestion,
     dailyActivity,
@@ -161,7 +161,8 @@ export const QuestionsView: React.FC = () => {
           </div>
         )}
 
-        {isAdmin && !isReviewMode && (
+        {/* Teacher-only: hidden whenever the teacher is previewing as a student. */}
+        {isAdmin && !isStudentViewMode && !isReviewMode && (
           <div className="mt-4 flex items-center justify-end">
             <button
               type="button"
@@ -346,6 +347,11 @@ export const QuestionsView: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
+            {!isReviewMode && gameSettings?.focusUnitId && currentQuestion.unitId === gameSettings.focusUnitId && (
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold">
+                ⭐ Unit Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
+              </span>
+            )}
             <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
               {currentQuestion.topic}
             </span>
@@ -435,7 +441,7 @@ export const QuestionsView: React.FC = () => {
                 {lastResult.isReviewMode ? (
                   lastResult.masteryDelta > 0 ? (
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
-                      <span>+{lastResult.masteryDelta} Mastery</span>
+                      <span>+{lastResult.masteryDelta} Mastery{lastResult.coinsAwarded > 0 ? ` · +${lastResult.coinsAwarded} Coins` : ''}</span>
                     </div>
                   ) : (
                     <span className="text-xs text-slate-400">Still in your review queue — try again next round</span>

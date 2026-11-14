@@ -8,6 +8,7 @@ import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
 import { CardDetailModal } from './CardDetailModal';
+import { DashboardEngagement } from './EngagementBanners';
 import { RARITY_COLORS } from '../data/cards';
 import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
 
@@ -111,6 +112,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      <DashboardEngagement onNavigate={onNavigate} />
 
       {/* Collection Binder Progress Summary Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">

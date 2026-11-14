@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { getAvatarById } from '../data/avatars';
-import { isFirebaseConfigured, db, doc, getDoc } from '../firebase/config';
+import { Snapshot, fetchSnapshot } from '../utils/snapshot';
+import { CompetitionBoards } from './CompetitionBoards';
 import { Achievement } from '../types';
 import { sounds } from '../utils/audio';
 import { 
@@ -35,17 +36,12 @@ interface LeaderboardViewProps {
 }
 
 const MAX_LEADERBOARD_ROWS = 25;
-// The snapshot only changes when the teacher publishes it, so there's no
-// point re-reading it on every visit. Cache it, and rate-limit Refresh.
-const LEADERBOARD_CACHE_KEY = 'hcq_leaderboard_snapshot';
-const LEADERBOARD_TTL_MS = 10 * 60 * 1000;
-const REFRESH_COOLDOWN_MS = 60 * 1000;
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
   const { inventoryCards, stats } = useCards();
 
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'achievements'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'boards' | 'achievements'>('leaderboard');
   const [achievementCategory, setAchievementCategory] = useState<string>('all');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [justClaimedReward, setJustClaimedReward] = useState<{ id: string; reward: number } | null>(null);
@@ -55,68 +51,31 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const [snapshotGeneratedAt, setSnapshotGeneratedAt] = useState<string | null>(null);
 
-  const lastFetchAt = useRef<number>(0);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
-  const applySnapshotData = (data: any) => {
-    const list: LeaderboardEntry[] = (data?.entries || []).map((e: any) => ({
-      uid: e.uid,
-      displayName: e.displayName,
-      avatar: e.avatar,
-      classroomCode: e.classroomCode,
-      coins: e.coins ?? 0,
-      uniqueCards: e.uniqueCardsCollected ?? 0,
-      totalCards: e.totalCardsCollected ?? 0
-    }));
-    setEntries(list);
-    setSnapshotGeneratedAt(data?.generatedAt || null);
-  };
-
-  const fetchLeaderboard = async (force: boolean = false) => {
-    if (!isFirebaseConfigured || !db || !doc || !getDoc) {
-      setLoadingEntries(false);
-      return;
-    }
-
-    if (force) {
-      if (Date.now() - lastFetchAt.current < REFRESH_COOLDOWN_MS) return;
-    } else {
-      try {
-        const cached = JSON.parse(localStorage.getItem(LEADERBOARD_CACHE_KEY) || 'null');
-        if (cached?.data && Date.now() - cached.at < LEADERBOARD_TTL_MS) {
-          applySnapshotData(cached.data);
-          setLoadingEntries(false);
-          return;
-        }
-      } catch {
-        // ignore a bad cache and fall through to a real read
-      }
-    }
-
-    lastFetchAt.current = Date.now();
+  // One shared, cached snapshot read (see utils/snapshot.ts). Refresh is
+  // rate-limited there, so mashing the button can't run up reads.
+  const loadSnapshot = async (force: boolean = false) => {
     setLoadingEntries(true);
-    try {
-      const snapshotRef = doc(db, 'leaderboard', 'snapshot');
-      const snap = await getDoc(snapshotRef);
-      if (snap && typeof snap.exists === 'function' && snap.exists()) {
-        const data = snap.data() as any;
-        applySnapshotData(data);
-        try {
-          localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify({ at: Date.now(), data: { entries: data.entries || [], generatedAt: data.generatedAt || null } }));
-        } catch {
-          // ignore
-        }
-      } else {
-        setEntries([]);
-      }
-    } catch (e) {
-      console.warn('Leaderboard fetch notice:', e);
-    } finally {
-      setLoadingEntries(false);
-    }
+    const snap = await fetchSnapshot(force);
+    setSnapshot(snap);
+    setEntries(
+      (snap?.entries || []).map((e: any) => ({
+        uid: e.uid,
+        displayName: e.displayName,
+        avatar: e.avatar,
+        classroomCode: e.classroomCode,
+        coins: e.coins ?? 0,
+        uniqueCards: e.uniqueCardsCollected ?? 0,
+        totalCards: e.totalCardsCollected ?? 0
+      }))
+    );
+    setSnapshotGeneratedAt(snap?.generatedAt || null);
+    setLoadingEntries(false);
   };
 
   useEffect(() => {
-    fetchLeaderboard();
+    loadSnapshot(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -180,6 +139,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
         current = ownedUnitCards.size;
         break;
       }
+      case 'donations':
+        current = userProfile?.classDonations || 0;
+        break;
       case 'mythical_pulled': {
         const hasMythical = inventoryCards.some(
           item => item.card?.rarity === 'Legendary' || item.card?.rarity === 'Mythical'
@@ -216,7 +178,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const completedAchievementsCount = useMemo(() => {
     return HISTORICAL_ACHIEVEMENTS.filter(a => checkAchievementProgress(a).isCompleted).length;
-  }, [userClaimedList, stats.uniqueCards, inventoryCards, userProfile?.totalQuestionsAnsweredLifetime, userProfile?.totalCorrectAnswersLifetime]);
+  }, [userClaimedList, stats.uniqueCards, inventoryCards, userProfile?.totalQuestionsAnsweredLifetime, userProfile?.totalCorrectAnswersLifetime, userProfile?.classDonations]);
 
   const filteredAchievements = useMemo(() => {
     if (achievementCategory === 'all') return HISTORICAL_ACHIEVEMENTS;
@@ -281,6 +243,19 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
           
           <button
             type="button"
+            onClick={() => setActiveTab('boards')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'boards'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Medal className="w-4 h-4" />
+            <span>Weekly &amp; Class Periods</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('achievements')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'achievements'
@@ -293,6 +268,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
           </button>
         </div>
       </div>
+
+      {/* WEEKLY BOARDS + CLASS PERIOD STANDINGS */}
+      {activeTab === 'boards' && (
+        <CompetitionBoards snapshot={snapshot} currentUid={userProfile?.uid || ''} myPeriod={userProfile?.classroomCode || ''} />
+      )}
 
       {/* TAB 1: LEADERBOARD */}
       {activeTab === 'leaderboard' && (
@@ -309,7 +289,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
             </div>
             <button
               type="button"
-              onClick={() => fetchLeaderboard(true)}
+              onClick={() => loadSnapshot(true)}
               disabled={loadingEntries}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
             >

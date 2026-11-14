@@ -18,6 +18,12 @@ export interface UserProfile {
   unitMastery?: Record<string, number>;
   totalQuestionsAnsweredLifetime?: number;
   totalCorrectAnswersLifetime?: number;
+  // Engagement features -- all stored on the user doc so they ride along with
+  // writes that already happen (no extra reads).
+  claimedGoalIds?: string[];
+  claimedClassMilestones?: string[];
+  claimedSubmissionIds?: string[];
+  classDonations?: number;
 }
 
 export interface DailyActivity {
@@ -113,6 +119,22 @@ export interface Trade {
   updatedAt: string;
 }
 
+// A teacher-set goal the whole school works toward together.
+export interface ClassGoal {
+  goalId: string;
+  title: string;
+  metric: 'questions' | 'correct' | 'cards';
+  target: number;
+  baseline: number; // class total at the moment the goal started
+  rewardCoins: number; // paid to every student who claims it (50 or 100)
+  startedAt: string;
+}
+
+export interface UpcomingTest {
+  label: string;
+  date: string; // YYYY-MM-DD
+}
+
 export interface GameSettings {
   dailyQuestionLimit: number;
   correctCoinReward: number;
@@ -123,6 +145,13 @@ export interface GameSettings {
   guaranteedSlotProbabilities: Record<CardRarity, number>;
   adminUids: string[];
   classroomTimezone: string;
+  // Teacher-controlled engagement settings (null / empty = off)
+  periodCodes?: string[];
+  focusUnitId?: string;
+  focusCorrectReward?: number; // 15 or 20
+  reviewCoinReward?: number; // 0 or 3
+  classGoal?: ClassGoal | null;
+  upcomingTest?: UpcomingTest | null;
 }
 
 export interface Achievement {
@@ -133,7 +162,7 @@ export interface Achievement {
   icon: string;
   coinReward: number;
   requirement: {
-    type: 'questions_answered' | 'correct_questions' | 'unique_cards' | 'total_cards' | 'unit_cards' | 'mythical_pulled';
+    type: 'questions_answered' | 'correct_questions' | 'unique_cards' | 'total_cards' | 'unit_cards' | 'mythical_pulled' | 'donations';
     target: number;
     unitId?: string;
   };
@@ -158,6 +187,8 @@ export type NavigationTab =
   | 'packs'
   | 'collection'
   | 'leaderboard'
+  | 'classbinder'
+  | 'contribute'
   | 'profile'
   | 'admin'
   | 'student-view';

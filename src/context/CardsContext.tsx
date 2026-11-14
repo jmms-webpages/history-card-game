@@ -30,6 +30,7 @@ interface CardsContextType {
   openPack: (packId: string) => Promise<OpenPackResult>;
   sellDuplicate: (instanceId: string) => Promise<number>;
   sellAllDuplicates: () => Promise<{ soldCount: number; coinsEarned: number }>;
+  donateDuplicate: (cardId: string) => Promise<number>;
   getCardById: (cardId: string) => Card | undefined;
   isCardOwned: (cardId: string) => boolean;
   getCardCopies: (cardId: string) => number;
@@ -508,6 +509,25 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return sellValue;
   };
 
+  // Gives away ONE spare copy (never the last one) -- the caller has already
+  // confirmed the class binder accepted it. Pays the same as selling it.
+  const donateDuplicate = async (cardId: string): Promise<number> => {
+    assertBinderReady();
+    const copies = inventoryRef.current.filter(i => i.cardId === cardId);
+    if (copies.length <= 1) {
+      throw new Error('Your first copy stays in your own binder. Only spare duplicates can be donated.');
+    }
+    const card = cardMap.get(cardId);
+    if (!card) return 0;
+    const spare = copies[copies.length - 1];
+    const updated = inventoryRef.current.filter(i => i.instanceId !== spare.instanceId);
+    saveInventory(updated);
+    const value = DEFAULT_GAME_SETTINGS.duplicateSellValues[card.rarity] || 5;
+    await updateCoins(value);
+    sounds.playCoin();
+    return value;
+  };
+
   const sellAllDuplicates = async (): Promise<{ soldCount: number; coinsEarned: number }> => {
     assertBinderReady();
     const keepSet = new Set<string>();
@@ -631,6 +651,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       openPack,
       sellDuplicate,
       sellAllDuplicates,
+      donateDuplicate,
       getCardById,
       isCardOwned,
       getCardCopies,
