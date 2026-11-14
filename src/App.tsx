@@ -39,7 +39,7 @@ const MainAppContent: React.FC = () => {
           History Card Quest
         </p>
         <p className="text-xs text-slate-400 mt-1 font-mono">
-          Loading Ohio 8th Grade Social Studies Archive...
+          Loading...
         </p>
       </div>
     );

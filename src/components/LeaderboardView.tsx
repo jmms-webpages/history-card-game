@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
@@ -35,6 +35,11 @@ interface LeaderboardViewProps {
 }
 
 const MAX_LEADERBOARD_ROWS = 25;
+// The snapshot only changes when the teacher publishes it, so there's no
+// point re-reading it on every visit. Cache it, and rate-limit Refresh.
+const LEADERBOARD_CACHE_KEY = 'hcq_leaderboard_snapshot';
+const LEADERBOARD_TTL_MS = 10 * 60 * 1000;
+const REFRESH_COOLDOWN_MS = 60 * 1000;
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
@@ -50,28 +55,56 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const [snapshotGeneratedAt, setSnapshotGeneratedAt] = useState<string | null>(null);
 
-  const fetchLeaderboard = async () => {
+  const lastFetchAt = useRef<number>(0);
+
+  const applySnapshotData = (data: any) => {
+    const list: LeaderboardEntry[] = (data?.entries || []).map((e: any) => ({
+      uid: e.uid,
+      displayName: e.displayName,
+      avatar: e.avatar,
+      classroomCode: e.classroomCode,
+      coins: e.coins ?? 0,
+      uniqueCards: e.uniqueCardsCollected ?? 0,
+      totalCards: e.totalCardsCollected ?? 0
+    }));
+    setEntries(list);
+    setSnapshotGeneratedAt(data?.generatedAt || null);
+  };
+
+  const fetchLeaderboard = async (force: boolean = false) => {
     if (!isFirebaseConfigured || !db || !doc || !getDoc) {
       setLoadingEntries(false);
       return;
     }
+
+    if (force) {
+      if (Date.now() - lastFetchAt.current < REFRESH_COOLDOWN_MS) return;
+    } else {
+      try {
+        const cached = JSON.parse(localStorage.getItem(LEADERBOARD_CACHE_KEY) || 'null');
+        if (cached?.data && Date.now() - cached.at < LEADERBOARD_TTL_MS) {
+          applySnapshotData(cached.data);
+          setLoadingEntries(false);
+          return;
+        }
+      } catch {
+        // ignore a bad cache and fall through to a real read
+      }
+    }
+
+    lastFetchAt.current = Date.now();
     setLoadingEntries(true);
     try {
       const snapshotRef = doc(db, 'leaderboard', 'snapshot');
       const snap = await getDoc(snapshotRef);
       if (snap && typeof snap.exists === 'function' && snap.exists()) {
         const data = snap.data() as any;
-        const list: LeaderboardEntry[] = (data.entries || []).map((e: any) => ({
-          uid: e.uid,
-          displayName: e.displayName,
-          avatar: e.avatar,
-          classroomCode: e.classroomCode,
-          coins: e.coins ?? 0,
-          uniqueCards: e.uniqueCardsCollected ?? 0,
-          totalCards: e.totalCardsCollected ?? 0
-        }));
-        setEntries(list);
-        setSnapshotGeneratedAt(data.generatedAt || null);
+        applySnapshotData(data);
+        try {
+          localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify({ at: Date.now(), data: { entries: data.entries || [], generatedAt: data.generatedAt || null } }));
+        } catch {
+          // ignore
+        }
       } else {
         setEntries([]);
       }
@@ -126,10 +159,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
     switch (ach.requirement.type) {
       case 'questions_answered':
-        current = 0;
+        current = userProfile?.totalQuestionsAnsweredLifetime || 0;
         break;
       case 'correct_questions':
-        current = 0;
+        current = userProfile?.totalCorrectAnswersLifetime || 0;
         break;
       case 'unique_cards':
         current = stats.uniqueCards;
@@ -166,7 +199,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
   };
 
   const handleClaimAchievement = async (ach: Achievement) => {
-    if (claimingId) return;
+    if (claimingId || userClaimedList.includes(ach.id)) return;
     setClaimingId(ach.id);
     sounds.playAchievement();
 
@@ -183,7 +216,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
   const completedAchievementsCount = useMemo(() => {
     return HISTORICAL_ACHIEVEMENTS.filter(a => checkAchievementProgress(a).isCompleted).length;
-  }, [userClaimedList, stats.uniqueCards, inventoryCards]);
+  }, [userClaimedList, stats.uniqueCards, inventoryCards, userProfile?.totalQuestionsAnsweredLifetime, userProfile?.totalCorrectAnswersLifetime]);
 
   const filteredAchievements = useMemo(() => {
     if (achievementCategory === 'all') return HISTORICAL_ACHIEVEMENTS;
@@ -276,7 +309,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
             </div>
             <button
               type="button"
-              onClick={fetchLeaderboard}
+              onClick={() => fetchLeaderboard(true)}
               disabled={loadingEntries}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-950 border border-slate-800 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
             >

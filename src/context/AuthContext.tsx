@@ -228,13 +228,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore
     }
 
+    // True only when the server actually answered (profile found OR confirmed
+    // missing). If the read timed out / failed, we must NOT write our guess
+    // back: a new device with no cache would otherwise reset a student's
+    // coins to the starting amount on the server.
+    let remoteConfirmed = false;
+
     if (isFirebaseConfigured && db && doc) {
       try {
         const userRef = doc(db, 'users', uid);
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
         const snapshot = await Promise.race([getDoc(userRef), timeoutPromise]) as any;
-        if (snapshot && typeof snapshot.exists === 'function' && snapshot.exists()) {
-          existingData = { ...existingData, ...(snapshot.data() as Partial<UserProfile>) };
+        if (snapshot && typeof snapshot.exists === 'function') {
+          remoteConfirmed = true;
+          if (snapshot.exists()) {
+            existingData = { ...existingData, ...(snapshot.data() as Partial<UserProfile>) };
+          }
         }
       } catch (e) {
         console.warn('Firestore fetch notice (using cached profile):', e);
@@ -269,7 +278,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       claimedAchievements: existingData.claimedAchievements ?? []
     };
 
-    if (isFirebaseConfigured && db && doc) {
+    if (isFirebaseConfigured && db && doc && remoteConfirmed) {
       const userRef = doc(db, 'users', uid);
       setDoc(userRef, combinedProfile, { merge: true }).catch(e => {
         console.warn('Async firestore write notice:', e);

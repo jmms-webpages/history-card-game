@@ -4,6 +4,7 @@ import { INITIAL_QUESTIONS } from '../data/questions';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 import { useAuth, MASTERY_CORRECT_GAIN, MASTERY_INCORRECT_PENALTY } from './AuthContext';
 import { sounds } from '../utils/audio';
+import { isFresh, markFetched } from '../utils/cache';
 import {
   isFirebaseConfigured,
   db,
@@ -157,12 +158,13 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !doc || !getDoc) return;
+    if (!isFirebaseConfigured || !db || !doc || !getDoc || isFresh('settings')) return;
     (async () => {
       try {
         const settingsRef = doc(db, 'settings', 'gameSettings');
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
         const snap = await Promise.race([getDoc(settingsRef), timeout]) as any;
+        if (snap && typeof snap.exists === 'function') markFetched('settings');
         if (snap && typeof snap.exists === 'function' && snap.exists()) {
           const merged = { ...DEFAULT_GAME_SETTINGS, ...(snap.data() as Partial<GameSettings>) };
           setGameSettings(merged);
@@ -177,19 +179,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const updateGameSettings = (updates: Partial<GameSettings>) => {
-    setGameSettings(prev => {
-      const next = { ...prev, ...updates };
-      try {
-        localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(next));
-      } catch {}
-      if (isFirebaseConfigured && db && doc && setDoc) {
-        const settingsRef = doc(db, 'settings', 'gameSettings');
-        setDoc(settingsRef, next, { merge: true }).catch(e => {
-          console.warn('Game settings sync notice:', e);
-        });
-      }
-      return next;
-    });
+    // Side effects (storage + Firestore write) live OUTSIDE the state updater,
+    // which React may run more than once.
+    const next = { ...gameSettings, ...updates };
+    setGameSettings(next);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(next));
+    } catch {}
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      const settingsRef = doc(db, 'settings', 'gameSettings');
+      setDoc(settingsRef, next, { merge: true }).catch(e => {
+        console.warn('Game settings sync notice:', e);
+      });
+    }
   };
 
   const [questions, setQuestions] = useState<Question[]>(() => {
@@ -215,13 +217,14 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('questions')) return;
     (async () => {
       try {
         const questionsColl = collection(db, 'questions');
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
         const snap = await Promise.race([getDocs(questionsColl), timeout]) as any;
         if (snap && snap.docs) {
+          markFetched('questions');
           const remoteDocs = snap.docs.map((d: any) => d.data());
           setQuestions(prev => {
             const merged = mergeRemoteQuestions(prev, remoteDocs);

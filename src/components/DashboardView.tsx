@@ -141,7 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 </h3>
               </div>
               <p className="text-xs text-slate-400">
-                {stats.uniqueCards} of {stats.totalInSet} unique curriculum cards collected
+                {stats.uniqueCards} of {stats.totalInSet} unique cards collected
               </p>
             </div>
           </div>
@@ -175,7 +175,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             />
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-            <span>{stats.completionPercentage}% of Ohio 8th Grade Set Archived</span>
+            <span>{stats.completionPercentage}% of the set collected</span>
             <span>{stats.duplicatesCount} Duplicates Available to Sell</span>
           </div>
         </div>
@@ -286,7 +286,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-slate-100">
-              Ohio 8th Grade Social Studies Curriculum Units
+              Units
             </h2>
           </div>
         </div>

@@ -141,13 +141,13 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold mb-2">
               <Library className="w-3.5 h-3.5" />
-              <span>Ohio 8th Grade Social Studies Archive</span>
+              <span>Your Collection</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">
               History Collection Binder
             </h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl">
-              Discover and archive key historical figures, seminal primary source documents, pivotal battles, and enduring artifacts from Ohio and United States history.
+              Collect key figures, documents, battles, and artifacts from Ohio and U.S. history.
             </p>
           </div>
 
@@ -393,7 +393,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
                 Your Binder is Ready for Its First Cards!
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Visit the Card Pack Depot to open booster packs and begin assembling Ohio 8th Grade Social Studies history.
+                Visit the Card Pack Depot to open booster packs and start building your collection.
               </p>
             </div>
           </div>

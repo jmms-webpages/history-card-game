@@ -133,7 +133,7 @@ export const QuestionsView: React.FC = () => {
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
               {isReviewMode
                 ? 'Work back through questions you missed before — get it right and it graduates off this list for good.'
-                : 'Ohio 8th Grade Social Studies (1492–1877) • Earn coins to open card packs'}
+                : 'Answer questions, earn coins, and open card packs'}
             </p>
           </div>
 

@@ -33,7 +33,7 @@ export const AuthView: React.FC = () => {
           </p>
 
           <p className="mt-2 text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto">
-            Answer curriculum trivia, earn coins, and collect historical figures, events, and artifacts.
+            Answer trivia, earn coins, and collect historical figures, events, and artifacts.
           </p>
         </div>
 
