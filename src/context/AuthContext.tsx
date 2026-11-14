@@ -486,6 +486,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (typeof isCorrect === 'boolean') {
       updates.totalQuestionsAnsweredLifetime = (base.totalQuestionsAnsweredLifetime || 0) + 1;
       updates.totalCorrectAnswersLifetime = (base.totalCorrectAnswersLifetime || 0) + (isCorrect ? 1 : 0);
+      const dayKey = new Date().toLocaleDateString('en-CA');
+      const sameDay = base.todayDate === dayKey;
+      updates.todayDate = dayKey;
+      updates.todayQuestions = (sameDay ? base.todayQuestions || 0 : 0) + 1;
+      updates.todayCorrect = (sameDay ? base.todayCorrect || 0 : 0) + (isCorrect ? 1 : 0);
     }
 
     const updated = applyProfileUpdate(updates);

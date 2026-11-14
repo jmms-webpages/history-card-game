@@ -12,6 +12,7 @@ import { AdminEngagementPanel } from './AdminEngagementPanel';
 import { AdminSubmissionsPanel } from './AdminSubmissionsPanel';
 import { AdminClassesPanel } from './AdminClassesPanel';
 import { AdminHonorPanel } from './AdminHonorPanel';
+import { AdminOverviewPanel } from './AdminOverviewPanel';
 import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw, Pencil } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -58,7 +59,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     }
   });
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
-  const [studentSearch, setStudentSearch] = useState<string>('');
 
   const fetchStudents = async (): Promise<UserProfile[] | undefined> => {
     if (!isFirebaseConfigured || !db || !collection || !getDocs || !query || !where) return;
@@ -115,19 +115,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     }
   };
 
-  // Makes the student type their name again the next time they open the site.
-  const requireNewName = async (student: UserProfile) => {
-    if (!db || !doc || !updateDoc) return;
-    if (!window.confirm(`Make ${student.displayName} enter their name again on their next visit?`)) return;
-    try {
-      await updateDoc(doc(db, 'users', student.uid), { nameSet: false });
-      patchRoster(student.uid, { nameSet: false });
-    } catch (e) {
-      console.warn('Reset name notice:', e);
-      window.alert('Could not reset this name -- check your connection and try again.');
-    }
-  };
-
   // Deletes the profile (coins, cards and class). If the student signs in
   // again they start over as a brand-new student and go through setup.
   const removeStudent = async (student: UserProfile) => {
@@ -170,36 +157,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     }
   };
 
-  const [studentClassFilter, setStudentClassFilter] = useState<string>('all');
-  const classList = gameSettings.classes || [];
-  const classTeachers = Array.from(new Set(classList.map(c => c.teacher)));
-
   // Lets the sidebar show the roster size without owning the roster.
   useEffect(() => {
     onStudentCount?.(students.length);
   }, [students.length]);
-
-  const filteredStudents = students.filter(s => {
-    const code = (s.classroomCode || '').trim().toUpperCase();
-    if (studentClassFilter === 'unassigned') {
-      if (classList.some(c => c.code === code)) return false;
-    } else if (studentClassFilter.startsWith('teacher:')) {
-      const t = studentClassFilter.slice(8);
-      if (!classList.some(c => c.teacher === t && c.code === code)) return false;
-    } else if (studentClassFilter !== 'all' && code !== studentClassFilter) {
-      return false;
-    }
-    if (!studentSearch.trim()) return true;
-    const term = studentSearch.toLowerCase();
-    return s.displayName.toLowerCase().includes(term) || (s.email || '').toLowerCase().includes(term);
-  });
 
   // Honor Roll snapshot -- deliberately NOT automatic. Rankings only change
   // when you click this, reusing the roster already loaded above so it
   // costs zero extra reads beyond what "Refresh Roster" already does.
   const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false);
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
-  const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
 
   const refreshLeaderboardSnapshot = async (rosterOverride?: UserProfile[]) => {
     const roster = rosterOverride ?? students;
@@ -211,27 +178,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       await publishSnapshot(roster, cards.filter(c => c.active).length, gameSettings.classes || []);
       setLeaderboardUpdatedAt(new Date().toLocaleString());
 
-      // Class Mastery by Unit -- a free byproduct of data already in hand,
-      // sorted worst-first so it's easy to spot what needs reteaching.
-      const unitTotals: Record<string, { sum: number; count: number }> = {};
-      roster.forEach(s => {
-        INITIAL_UNITS.forEach(u => {
-          const points = s.unitMastery?.[u.unitId] || 0;
-          if (!unitTotals[u.unitId]) unitTotals[u.unitId] = { sum: 0, count: 0 };
-          unitTotals[u.unitId].sum += points;
-          unitTotals[u.unitId].count += 1;
-        });
-      });
-      const averages = INITIAL_UNITS.map(u => {
-        const t = unitTotals[u.unitId] || { sum: 0, count: 1 };
-        const avgPoints = t.count > 0 ? t.sum / t.count : 0;
-        return {
-          unitId: u.unitId,
-          unitName: u.unitName,
-          avgPercent: Math.round((avgPoints / MASTERY_TARGET_POINTS) * 100)
-        };
-      }).sort((a, b) => a.avgPercent - b.avgPercent);
-      setUnitMasteryAverages(averages);
     } catch (e) {
       console.warn('Leaderboard refresh notice:', e);
     } finally {
@@ -444,279 +390,40 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
       </div>
 
+      {activeSubTab === 'overview' && (
+        <AdminOverviewPanel
+          students={students}
+          loading={loadingStudents}
+          publishing={refreshingLeaderboard}
+          lastPublished={leaderboardUpdatedAt}
+          onRefreshAndPublish={refreshAndPublish}
+          onGo={setActiveSubTab}
+        />
+      )}
       {activeSubTab === 'classes' && (
         <AdminClassesPanel
           students={students}
-          onStudentMoved={(uid, code) =>
-            setStudents(prev => {
-              const next = prev.map(s => (s.uid === uid ? { ...s, classroomCode: code } : s));
-              try {
-                localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(next));
-              } catch {
-                // ignore
-              }
-              return next;
-            })
-          }
+          loading={loadingStudents}
+          onRefresh={fetchStudents}
+          promotingUid={promotingUid}
+          onRename={renameStudent}
+          onRemove={removeStudent}
+          onPromote={promoteToAdmin}
+          onStudentMoved={(uid, code) => patchRoster(uid, { classroomCode: code })}
         />
       )}
       {activeSubTab === 'honor' && (
-        <AdminHonorPanel
-          students={students}
-          busy={refreshingLeaderboard || loadingStudents}
-          lastPublished={leaderboardUpdatedAt}
-          onRefreshAndPublish={refreshAndPublish}
-        />
+        <div className="space-y-4">
+          <AdminHonorPanel
+            students={students}
+            busy={refreshingLeaderboard || loadingStudents}
+            lastPublished={leaderboardUpdatedAt}
+            onRefreshAndPublish={refreshAndPublish}
+          />
+          <AdminEngagementPanel />
+        </div>
       )}
-      {activeSubTab === 'engagement' && <AdminEngagementPanel />}
       {activeSubTab === 'submissions' && <AdminSubmissionsPanel />}
-
-      {/* Students Roster Tab */}
-      {activeSubTab === 'students' && (
-        <div className="space-y-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
-            <div className="flex items-center gap-2 flex-1 w-full sm:max-w-xs">
-              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Search students..."
-                className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
-              />
-            </div>
-            <select
-              value={studentClassFilter}
-              onChange={(e) => setStudentClassFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
-            >
-              <option value="all">All classes</option>
-              <option value="unassigned">No class yet</option>
-              {classTeachers.map(t => (
-                <optgroup key={t} label={t}>
-                  <option value={`teacher:${t}`}>All of {t}'s classes</option>
-                  {classList.filter(c => c.teacher === t).map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
-              <span className="text-xs text-slate-400 font-mono">{filteredStudents.length} of {students.length} students</span>
-              <button
-                type="button"
-                onClick={fetchStudents}
-                disabled={loadingStudents}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingStudents ? 'animate-spin' : ''}`} />
-                <span>Refresh Roster</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => refreshLeaderboardSnapshot()}
-                disabled={refreshingLeaderboard || students.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50"
-                title="Publish today's rankings to the Honor Roll -- students won't see any change until you click this."
-              >
-                <Award className={`w-3.5 h-3.5 ${refreshingLeaderboard ? 'animate-pulse' : ''}`} />
-                <span>{refreshingLeaderboard ? 'Publishing...' : 'Publish Honor Roll'}</span>
-              </button>
-            </div>
-          </div>
-
-          {leaderboardUpdatedAt && (
-            <p className="text-[11px] text-slate-500 -mt-1">
-              Honor Roll last published: <span className="text-slate-300 font-mono">{leaderboardUpdatedAt}</span> — students see this exact snapshot until you publish again.
-            </p>
-          )}
-
-          {unitMasteryAverages.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow">
-              <h3 className="font-bold text-slate-100 text-sm mb-1">Class Mastery by Unit</h3>
-              <p className="text-xs text-slate-400 mb-4">Sorted worst to best — a low number here is a signal worth reteaching, not a single "worst question," but the trend.</p>
-              <div className="space-y-3">
-                {unitMasteryAverages.map(u => (
-                  <div key={u.unitId}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-bold text-slate-200">{u.unitName}</span>
-                      <span className={`font-mono font-bold ${u.avgPercent < 40 ? 'text-rose-400' : u.avgPercent < 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {u.avgPercent}% avg mastery
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                      <div
-                        className={`h-full rounded-full ${u.avgPercent < 40 ? 'bg-rose-500' : u.avgPercent < 70 ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                        style={{ width: `${u.avgPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Student</th>
-                    <th className="py-3 px-4">Class</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4 text-center">Accuracy</th>
-                    <th className="py-3 px-4 text-center">Unique Cards</th>
-                    <th className="py-3 px-4 text-center">Total Cards</th>
-                    <th className="py-3 px-4 text-right">Coins</th>
-                    <th className="py-3 px-4 text-right">Last Active</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {filteredStudents.map(s => (
-                    <tr key={s.uid} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-100">{s.displayName}</td>
-                      <td className="py-3 px-4 text-slate-300">{classLabel(classList, s.classroomCode)}</td>
-                      <td className="py-3 px-4 text-slate-400 font-mono">{s.email}</td>
-                      <td className="py-3 px-4 text-center font-mono">
-                        {s.totalQuestionsAnsweredLifetime
-                          ? `${Math.round((s.totalCorrectAnswersLifetime || 0) / s.totalQuestionsAnsweredLifetime * 100)}%`
-                          : '—'}
-                        {s.totalQuestionsAnsweredLifetime ? (
-                          <span className="text-slate-500 text-[10px]"> ({s.totalQuestionsAnsweredLifetime})</span>
-                        ) : null}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{s.uniqueCardsCollected ?? 0}</td>
-                      <td className="py-3 px-4 text-center font-mono text-slate-300">{s.totalCardsCollected ?? 0}</td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-300">{s.coins ?? 0}</td>
-                      <td className="py-3 px-4 text-right text-slate-500 font-mono">
-                        {s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                        <button type="button" onClick={() => renameStudent(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 cursor-pointer">Rename</button>
-                        <button type="button" onClick={() => requireNewName(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 cursor-pointer">Reset name</button>
-                        <button type="button" onClick={() => removeStudent(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 cursor-pointer">Remove</button>
-                        <button
-                          type="button"
-                          onClick={() => promoteToAdmin(s)}
-                          disabled={promotingUid === s.uid}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          {promotingUid === s.uid ? 'Promoting...' : 'Promote to Admin'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!loadingStudents && filteredStudents.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="py-8 text-center text-slate-500">
-                        No students found yet — they'll appear here after their first sign-in.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1. Overview Tab */}
-      {activeSubTab === 'overview' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                <span>Active Question Bank</span>
-                <HelpCircle className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-3xl font-black text-slate-100 font-mono">
-                {questions.filter(q => q.active).length}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">Ready across all 8 curriculum units</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                <span>Catalog Cards</span>
-                <Package className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-3xl font-black text-slate-100 font-mono">
-                {cards.filter(c => c.active).length}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">Available in booster packs</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                <span>Ohio 2026 Standards</span>
-                <Award className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-3xl font-black text-slate-100 font-mono">
-                {INITIAL_STANDARDS.length}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">100% Social Studies coverage</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow">
-              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                <span>Student Privacy Standard</span>
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-              <p className="text-xl font-bold text-emerald-400 font-mono">FERPA Compliant</p>
-              <p className="text-xs text-slate-400 mt-1">Zero public PII exposed</p>
-            </div>
-          </div>
-
-          {/* Quick Admin Navigation Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div 
-              onClick={() => setActiveSubTab('questions')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
-                <HelpCircle className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-100 text-sm group-hover:text-amber-400 transition-colors">
-                Question Bank Manager
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Add, activate, or deactivate trivia questions mapped to Ohio curriculum units and historical explanations.
-              </p>
-            </div>
-
-            <div 
-              onClick={() => setActiveSubTab('cards')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-slate-950 transition-colors">
-                <Package className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-100 text-sm group-hover:text-indigo-400 transition-colors">
-                Card Catalog & Rarity Tuning
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Review historical figures, founding documents, artifacts, and tune drop percentages across rarity tiers.
-              </p>
-            </div>
-
-            <div 
-              onClick={() => setActiveSubTab('economy')}
-              className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors">
-                <Sliders className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-100 text-sm group-hover:text-emerald-400 transition-colors">
-                Classroom Economy Tuning
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Set daily student question caps, correct answer coin incentives, and pack purchase costs.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 2. Question Bank Tab */}
       {activeSubTab === 'questions' && (
@@ -1072,7 +779,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       )}
 
       {/* 4. Classroom Economy Tab */}
-      {activeSubTab === 'economy' && (
+      {activeSubTab === 'packs' && (
         <form onSubmit={handleSaveEconomy} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 animate-fadeIn">
           <div className="flex items-center justify-between">
             <div>
@@ -1160,50 +867,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <span>Apply Economy Settings</span>
           </button>
         </form>
-      )}
-
-      {/* 5. Curriculum Scope Tab */}
-      {activeSubTab === 'units' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 animate-fadeIn">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 text-base">Ohio 8th Grade Social Studies Scope (8 Units)</h3>
-            <span className="text-xs text-slate-400 font-mono">1492 to 1877 Reconstruction</span>
-          </div>
-          <div className="space-y-2.5">
-            {INITIAL_UNITS.map((unit) => (
-              <div key={unit.unitId} className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-start gap-3">
-                <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                  {unit.order}
-                </span>
-                <div className="flex-1">
-                  <h4 className="text-xs font-bold text-slate-200">{unit.unitName}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{unit.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 6. Ohio 2026 Standards Tab */}
-      {activeSubTab === 'standards' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 animate-fadeIn">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-100 text-base">Ohio 8th Grade Social Studies Standards (2026 Transition)</h3>
-            <span className="text-xs text-slate-400 font-mono">Curriculum Alignment Matrix</span>
-          </div>
-          <div className="space-y-2.5">
-            {INITIAL_STANDARDS.map((std) => (
-              <div key={std.standardId} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-amber-400">{std.standardId}</span>
-                  <span className="text-[11px] text-slate-400">{std.topic}</span>
-                </div>
-                <p className="text-xs text-slate-300">{std.standardDescription}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Add Custom Question Modal */}
