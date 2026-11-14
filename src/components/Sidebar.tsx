@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { NavigationTab } from '../types';
+import { NavigationTab, AdminSubTab } from '../types';
+import { useQuestions } from '../context/QuestionsContext';
+import { useCards } from '../context/CardsContext';
+import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { getAvatarById } from '../data/avatars';
-import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil } from 'lucide-react';
+import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil, LayoutDashboard, BookOpen, Sliders, Award, MessageSquare, ArrowLeft } from 'lucide-react';
 import { AvatarFace } from './AvatarFace';
 
 interface SidebarProps {
   currentTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
+  adminTab: AdminSubTab;
+  onSelectAdminTab: (tab: AdminSubTab) => void;
+  studentCount: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, adminTab, onSelectAdminTab, studentCount }) => {
   const { 
     userProfile, 
     logout,  
@@ -19,9 +25,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     setStudentViewMode, 
     toggleStudentViewMode 
   } = useAuth();
+  const { questions } = useQuestions();
+  const { cards } = useCards();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!userProfile) return null;
+
+  // Teachers get the admin menu; Student View swaps back to the student menu.
+  const adminMode = isAdmin && !isStudentViewMode;
+  const adminNavItems: { id: AdminSubTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview', label: 'System Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: 'students', label: `Students (${studentCount})`, icon: <Users className="w-4 h-4" /> },
+    { id: 'questions', label: `Question Bank (${questions.length})`, icon: <HelpCircle className="w-4 h-4" /> },
+    { id: 'cards', label: `Card Catalog & Rarity (${cards.length})`, icon: <Library className="w-4 h-4" /> },
+    { id: 'packs', label: 'Pack Availability', icon: <Package className="w-4 h-4" /> },
+    { id: 'economy', label: 'Classroom Economy & Daily Caps', icon: <Coins className="w-4 h-4" /> },
+    { id: 'classes', label: 'Classes', icon: <Users className="w-4 h-4" /> },
+    { id: 'engagement', label: 'Engagement & Competition', icon: <Trophy className="w-4 h-4" /> },
+    { id: 'submissions', label: 'Student Questions', icon: <MessageSquare className="w-4 h-4" /> },
+    { id: 'units', label: `Curriculum Scope (${INITIAL_UNITS.length} Units)`, icon: <BookOpen className="w-4 h-4" /> },
+    { id: 'standards', label: 'Ohio 2026 Standards Matrix', icon: <Award className="w-4 h-4" /> }
+  ];
 
   const currentAvatar = getAvatarById(userProfile.avatar);
 
@@ -72,6 +96,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           </div>
         </div>
 
+        {adminMode ? (
+          <div>
+            <p className="px-2.5 mb-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-amber-400/80 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" />
+              <span>Admin Console</span>
+            </p>
+            <nav className="space-y-1">
+              {adminNavItems.map((item) => {
+                const isActive = adminTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`sidebar-admin-${item.id}`}
+                    type="button"
+                    onClick={() => { onSelectAdminTab(item.id); setMobileOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left ${
+                      isActive
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-950/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                  >
+                    <span className={isActive ? 'text-slate-950' : 'text-slate-400'}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <button
+              id="sidebar-toggle-student-view"
+              type="button"
+              onClick={() => { toggleStudentViewMode(); onSelectTab('dashboard'); setMobileOpen(false); }}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer mt-3 bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span>Student View</span>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <>
         {/* Currency & Quick Pack Launcher Card */}
         <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 shadow-inner">
           <div className="flex items-center justify-between">
@@ -138,59 +203,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           </nav>
         </div>
 
-        {/* Educator & Management Section */}
-        {isAdmin && (
+          </>
+        )}
+        {isAdmin && isStudentViewMode && (
           <div className="pt-2 border-t border-slate-800/80">
-            <p className="px-2.5 mb-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-amber-400/80 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" />
-              <span>Educator Controls</span>
-            </p>
-            <div className="space-y-1">
-              {isAdmin && (
-                <button
-                  id="sidebar-nav-admin"
-                  type="button"
-                  onClick={() => handleTabClick('admin')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                    currentTab === 'admin' && !isStudentViewMode
-                      ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-950/30'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Settings className={`w-4 h-4 ${currentTab === 'admin' ? 'text-slate-950' : 'text-amber-400'}`} />
-                    <span>Admin Console</span>
-                  </div>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                    currentTab === 'admin' ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    Director
-                  </span>
-                </button>
-              )}
-
-              {/* Student View Toggle */}
-              <button
-                id="sidebar-toggle-student-view"
-                type="button"
-                onClick={toggleStudentViewMode}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer mt-1.5 ${
-                  isStudentViewMode
-                    ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300 hover:bg-emerald-900'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-emerald-400" />
-                  <span>Student View</span>
-                </div>
-                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                  isStudentViewMode ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  {isStudentViewMode ? 'Active' : 'Off'}
-                </span>
-              </button>
-            </div>
+            <button
+              id="sidebar-toggle-student-view"
+              type="button"
+              onClick={() => { toggleStudentViewMode(); setMobileOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer bg-emerald-950/80 border-emerald-700 text-emerald-300 hover:bg-emerald-900"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Admin Console</span>
+            </button>
           </div>
         )}
 
@@ -199,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       {/* Bottom Part: User Profile & Logout */}
       <div className="pt-4 border-t border-slate-800 mt-6 space-y-2">
         <div 
-          onClick={() => handleTabClick('profile')}
+          onClick={() => { if (!adminMode) handleTabClick('profile'); }}
           className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 transition-colors cursor-pointer group"
         >
           <div className={`w-8 h-8 rounded-full ${currentAvatar.color} overflow-hidden flex items-center justify-center text-xs font-bold text-white shadow shrink-0`}>
@@ -266,7 +291,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           {/* Quick User Avatar */}
           <button
             type="button"
-            onClick={() => handleTabClick('profile')}
+            onClick={() => { if (!adminMode) handleTabClick('profile'); }}
             className={`w-7 h-7 rounded-full ${currentAvatar.color} overflow-hidden flex items-center justify-center text-xs font-bold text-white shadow`}
           >
             <AvatarFace avatar={currentAvatar} />
