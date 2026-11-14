@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import { Target, Star, CalendarClock, Users, Flame, CheckCircle2 } from 'lucide-react';
+import { Star, CalendarClock, CheckCircle2, Trash2 } from 'lucide-react';
 import { useQuestions } from '../context/QuestionsContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
-import { UserProfile, ClassGoal } from '../types';
-import { startNewWeek } from '../utils/publishSnapshot';
-import { GOAL_METRIC_LABELS } from '../utils/snapshot';
+import { UpcomingTest } from '../types';
+import { classLabel } from '../utils/classes';
 
-// Teacher controls for the engagement features. Nothing here reads Firestore
-// on load -- the roster you already refreshed supplies the numbers.
-export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ students }) => {
+// Teacher controls for focus units and class-specific test reminders.
+// The class goal and weekly competition live on the Honor Roll tab.
+export const AdminEngagementPanel: React.FC = () => {
   const { gameSettings, updateGameSettings } = useQuestions();
+  const classes = gameSettings.classes || [];
+  const teachers = Array.from(new Set(classes.map(c => c.teacher)));
 
-  const [testLabel, setTestLabel] = useState(gameSettings.upcomingTest?.label || '');
-  const [testDate, setTestDate] = useState(gameSettings.upcomingTest?.date || '');
-
-  const [goalTitle, setGoalTitle] = useState('');
-  const [goalMetric, setGoalMetric] = useState<ClassGoal['metric']>('questions');
-  const [goalTarget, setGoalTarget] = useState(5000);
-  const [goalReward, setGoalReward] = useState(100);
-
-  const [weekMsg, setWeekMsg] = useState<string | null>(null);
+  const [testLabel, setTestLabel] = useState('');
+  const [testDate, setTestDate] = useState('');
+  const [targetCodes, setTargetCodes] = useState<string[]>([]); // empty = all classes
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const flash = (t: string) => {
@@ -27,59 +22,49 @@ export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ st
     setTimeout(() => setSavedMsg(null), 3000);
   };
 
-  const classTotal = (metric: ClassGoal['metric']) =>
-    students.reduce(
-      (sum, s) =>
-        sum +
-        (metric === 'questions'
-          ? s.totalQuestionsAnsweredLifetime || 0
-          : metric === 'correct'
-          ? s.totalCorrectAnswersLifetime || 0
-          : s.uniqueCardsCollected || 0),
-      0
-    );
+  // The old single reminder still shows until you delete it here.
+  const reminders: UpcomingTest[] = [
+    ...(gameSettings.upcomingTests || []),
+    ...(gameSettings.upcomingTest ? [{ ...gameSettings.upcomingTest, id: 'legacy' }] : [])
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
-  const saveTest = () => {
-    updateGameSettings({ upcomingTest: testLabel.trim() && testDate ? { label: testLabel.trim(), date: testDate } : null });
-    flash(testLabel.trim() && testDate ? 'Test reminder saved.' : 'Test reminder cleared.');
+  const toggleCode = (code: string) =>
+    setTargetCodes(prev => (prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]));
+
+  const toggleTeacher = (teacher: string) => {
+    const codes = classes.filter(c => c.teacher === teacher).map(c => c.code);
+    const all = codes.every(c => targetCodes.includes(c));
+    setTargetCodes(prev => (all ? prev.filter(c => !codes.includes(c)) : Array.from(new Set([...prev, ...codes]))));
   };
 
-  const startGoal = () => {
-    if (!goalTitle.trim() || goalTarget <= 0) return;
-    const goal: ClassGoal = {
-      goalId: `goal-${Date.now()}`,
-      title: goalTitle.trim(),
-      metric: goalMetric,
-      target: Math.round(goalTarget),
-      baseline: classTotal(goalMetric),
-      rewardCoins: goalReward,
-      startedAt: new Date().toISOString()
+  const addReminder = () => {
+    if (!testLabel.trim() || !testDate) return;
+    const next: UpcomingTest = {
+      id: `test-${Date.now()}`,
+      label: testLabel.trim(),
+      date: testDate,
+      classCodes: targetCodes
     };
-    updateGameSettings({ classGoal: goal });
-    setGoalTitle('');
-    flash('Class goal started. Progress updates each time you publish the Honor Roll.');
+    updateGameSettings({ upcomingTests: [...(gameSettings.upcomingTests || []), next] });
+    setTestLabel('');
+    setTestDate('');
+    setTargetCodes([]);
+    flash('Reminder added.');
   };
 
-  const handleNewWeek = async () => {
-    if (students.length === 0) {
-      setWeekMsg('Refresh the student roster first (Students tab).');
-      return;
+  const removeReminder = (r: UpcomingTest) => {
+    if (!window.confirm(`Remove the reminder "${r.label}"?`)) return;
+    if (r.id === 'legacy') {
+      updateGameSettings({ upcomingTest: null });
+    } else {
+      updateGameSettings({ upcomingTests: (gameSettings.upcomingTests || []).filter(t => t.id !== r.id) });
     }
-    if (!window.confirm('Start a new weekly competition? Everyone\'s weekly totals reset to zero.')) return;
-    try {
-      await startNewWeek(students);
-      setWeekMsg('New week started! Publish the Honor Roll to show the fresh boards.');
-    } catch (e: any) {
-      setWeekMsg(e?.message || 'Could not start a new week.');
-    }
+    flash('Reminder removed.');
   };
 
   const card = 'bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow space-y-3';
   const input = 'bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:border-amber-400 focus:outline-none';
-  const btn = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer';
-
-  const goal = gameSettings.classGoal;
-  const goalNow = goal ? Math.max(0, classTotal(goal.metric) - goal.baseline) : 0;
+  const btn = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer disabled:opacity-50';
 
   return (
     <div className="space-y-4 animate-fadeIn">
@@ -90,43 +75,8 @@ export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ st
       )}
 
       <div className={card}>
-        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Target className="w-4 h-4 text-indigo-300" /> Class Goal</h3>
-        {goal ? (
-          <div className="text-xs text-slate-300 space-y-2">
-            <p>
-              <strong>{goal.title}</strong> — {goal.target.toLocaleString()} {GOAL_METRIC_LABELS[goal.metric]}, reward +{goal.rewardCoins} coins each.
-            </p>
-            <p className="font-mono text-slate-400">
-              Right now (from your roster): {goalNow.toLocaleString()} / {goal.target.toLocaleString()}. Students see this after you publish the Honor Roll.
-            </p>
-            <button type="button" className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer" onClick={() => { updateGameSettings({ classGoal: null }); flash('Class goal cleared.'); }}>
-              End / Clear Goal
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-xs text-slate-400">Set one goal the whole school chases together. Refresh your roster first so the starting total is accurate.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input className={input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="Goal name, e.g. Road to Revolution" />
-              <select className={input} value={goalMetric} onChange={(e) => setGoalMetric(e.target.value as ClassGoal['metric'])}>
-                <option value="questions">Total questions answered</option>
-                <option value="correct">Total correct answers</option>
-                <option value="cards">Total unique cards collected</option>
-              </select>
-              <input className={input} type="number" min={1} value={goalTarget} onChange={(e) => setGoalTarget(Number(e.target.value))} placeholder="Target" />
-              <select className={input} value={goalReward} onChange={(e) => setGoalReward(Number(e.target.value))}>
-                <option value={50}>Reward: +50 coins each</option>
-                <option value={100}>Reward: +100 coins each</option>
-              </select>
-            </div>
-            <button type="button" className={btn} onClick={startGoal} disabled={!goalTitle.trim() || goalTarget <= 0}>Start Goal</button>
-          </>
-        )}
-      </div>
-
-      <div className={card}>
         <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Star className="w-4 h-4 text-amber-400" /> Unit Focus &amp; Review Bonus</h3>
-        <p className="text-xs text-slate-400">Boost the coins for correct answers in the unit you're teaching, and pay a small bonus for clearing missed questions in Review.</p>
+        <p className="text-xs text-slate-400">Boost the coins for correct answers in the unit you're teaching (those questions show in gold), and pay a small bonus for clearing missed questions in Review.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <select className={input} value={gameSettings.focusUnitId || ''} onChange={(e) => updateGameSettings({ focusUnitId: e.target.value })}>
             <option value="">No focus unit</option>
@@ -144,22 +94,70 @@ export const AdminEngagementPanel: React.FC<{ students: UserProfile[] }> = ({ st
       </div>
 
       <div className={card}>
-        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><CalendarClock className="w-4 h-4 text-rose-300" /> Upcoming Test Reminder</h3>
-        <p className="text-xs text-slate-400">Shows on every student's dashboard for the 3 weeks before the date, with a shortcut to their review questions. Clear both fields and save to remove it.</p>
-        <div className="flex gap-2 flex-wrap">
+        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><CalendarClock className="w-4 h-4 text-rose-300" /> Test Reminders</h3>
+        <p className="text-xs text-slate-400">
+          Each reminder shows on the dashboard of the classes you pick, for the 3 weeks before its date. Leave every class unchecked to send it to all classes.
+        </p>
+
+        {reminders.length > 0 && (
+          <div className="space-y-1.5">
+            {reminders.map(r => (
+              <div key={r.id || `${r.label}-${r.date}`} className="flex items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+                <div className="min-w-0">
+                  <span className="font-bold text-slate-100">{r.label}</span>
+                  <span className="ml-2 font-mono text-slate-400">{r.date}</span>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {r.classCodes && r.classCodes.length > 0
+                      ? r.classCodes.map(c => classLabel(classes, c)).join(', ')
+                      : 'All classes'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeReminder(r)}
+                  title="Remove reminder"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 flex-wrap pt-1">
           <input className={`${input} flex-1 min-w-[180px]`} value={testLabel} onChange={(e) => setTestLabel(e.target.value)} placeholder="Unit 3 Test" />
           <input className={input} type="date" value={testDate} onChange={(e) => setTestDate(e.target.value)} />
-          <button type="button" className={btn} onClick={saveTest}>Save</button>
         </div>
-      </div>
 
-      <div className={card}>
-        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Flame className="w-4 h-4 text-amber-400" /> Weekly Competition</h3>
-        <p className="text-xs text-slate-400">
-          Starting a new week records everyone's current totals; the weekly boards then show only what each student gains from here. Do this on Monday, then publish the Honor Roll each day or two.
-        </p>
-        <button type="button" className={btn} onClick={handleNewWeek}>Start New Week</button>
-        {weekMsg && <p className="text-xs text-emerald-300">{weekMsg}</p>}
+        {classes.length > 0 && (
+          <div className="space-y-2">
+            {teachers.map(t => {
+              const codes = classes.filter(c => c.teacher === t);
+              const allOn = codes.every(c => targetCodes.includes(c.code));
+              return (
+                <div key={t} className="text-xs">
+                  <label className="flex items-center gap-1.5 font-bold text-slate-200 cursor-pointer">
+                    <input type="checkbox" checked={allOn} onChange={() => toggleTeacher(t)} />
+                    <span>{t}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 ml-5">
+                    {codes.map(c => (
+                      <label key={c.code} className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                        <input type="checkbox" checked={targetCodes.includes(c.code)} onChange={() => toggleCode(c.code)} />
+                        <span>{c.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <button type="button" className={btn} onClick={addReminder} disabled={!testLabel.trim() || !testDate}>
+          Add Reminder {targetCodes.length > 0 ? `(${targetCodes.length} class${targetCodes.length === 1 ? '' : 'es'})` : '(all classes)'}
+        </button>
       </div>
     </div>
   );

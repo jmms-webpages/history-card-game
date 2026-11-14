@@ -144,8 +144,11 @@ export interface ClassInfo {
 }
 
 export interface UpcomingTest {
+  id?: string;
   label: string;
   date: string; // YYYY-MM-DD
+  // Class codes this reminder is for. Empty or missing means every class.
+  classCodes?: string[];
 }
 
 export interface GameSettings {
@@ -167,7 +170,8 @@ export interface GameSettings {
   focusCorrectReward?: number; // 15 or 20
   reviewCoinReward?: number; // 0 or 3
   classGoal?: ClassGoal | null;
-  upcomingTest?: UpcomingTest | null;
+  upcomingTest?: UpcomingTest | null; // legacy single reminder (all classes)
+  upcomingTests?: UpcomingTest[];
 }
 
 export interface Achievement {
@@ -220,4 +224,5 @@ export type AdminSubTab =
   | 'standards'
   | 'engagement'
   | 'submissions'
-  | 'classes';
+  | 'classes'
+  | 'honor';

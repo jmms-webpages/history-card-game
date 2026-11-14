@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
+import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
@@ -19,6 +20,8 @@ export const QuestionsView: React.FC = () => {
     isDailyLimitReached,
     practiceMode,
     setPracticeMode,
+    practiceUnitIds,
+    setPracticeUnitIds,
     resetDailyActivity,
     reviewQueueCount,
     isReviewMode,
@@ -71,6 +74,10 @@ export const QuestionsView: React.FC = () => {
     submitAnswer(index);
   };
 
+  // Focus-unit questions get a gold look so students know they pay a bonus.
+  const isFocusQuestion =
+    !isReviewMode && !practiceMode && !!gameSettings?.focusUnitId && currentQuestion?.unitId === gameSettings.focusUnitId;
+
   const questionsAnswered = dailyActivity?.questionsAnswered ?? 0;
   const correctAnswers = dailyActivity?.correctAnswers ?? 0;
   const coinsEarned = dailyActivity?.coinsEarned ?? 0;
@@ -99,7 +106,7 @@ export const QuestionsView: React.FC = () => {
               </span>
               {practiceMode && !isReviewMode && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[11px] font-medium">
-                  Practice Mode
+                  Practice Mode · no coins
                 </span>
               )}
               {isReviewMode && (
@@ -316,6 +323,57 @@ export const QuestionsView: React.FC = () => {
         </div>
       ) : null}
 
+      {/* Practice: pick any units, no coins, misses don't go to Review */}
+      {!isReviewMode && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-400">
+              {practiceMode
+                ? 'Practice earns no coins, and misses are not added to Review.'
+                : 'Want extra practice on specific units? It earns no coins.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setPracticeMode(!practiceMode)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                practiceMode ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+              }`}
+            >
+              {practiceMode ? 'Back to Daily Quest' : 'Practice by Unit'}
+            </button>
+          </div>
+          {practiceMode && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setPracticeUnitIds([])}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${
+                  practiceUnitIds.length === 0 ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'
+                }`}
+              >
+                All Units
+              </button>
+              {INITIAL_UNITS.map((u, i) => {
+                const on = practiceUnitIds.includes(u.unitId);
+                return (
+                  <button
+                    key={u.unitId}
+                    type="button"
+                    title={u.unitName}
+                    onClick={() => setPracticeUnitIds(on ? practiceUnitIds.filter(id => id !== u.unitId) : [...practiceUnitIds, u.unitId])}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${
+                      on ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    Unit {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Daily Cap Banner when limit reached */}
       {!isReviewMode && isDailyLimitReached && !practiceMode && (
         <div className="bg-gradient-to-r from-amber-500/15 via-slate-900 to-amber-500/15 border border-amber-500/30 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -344,12 +402,16 @@ export const QuestionsView: React.FC = () => {
 
       {/* Main Question Card */}
       {currentQuestion ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className={`rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden border ${
+          isFocusQuestion
+            ? 'bg-gradient-to-br from-amber-950/70 via-slate-900 to-slate-900 border-amber-400/70 shadow-amber-500/20 ring-1 ring-amber-400/30'
+            : 'bg-slate-900 border-slate-800'
+        }`}>
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            {!isReviewMode && gameSettings?.focusUnitId && currentQuestion.unitId === gameSettings.focusUnitId && (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-bold">
-                ⭐ Unit Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
+            {isFocusQuestion && (
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
+                ⭐ Bonus Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
               </span>
             )}
             <span className="px-2.5 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-[11px]">
@@ -379,8 +441,10 @@ export const QuestionsView: React.FC = () => {
               const isSelected = selectedOption === index;
               const isCorrectAnswer = index === currentQuestion.correctAnswer;
               
-              let buttonStyle = "bg-slate-950 hover:bg-slate-800/80 border-slate-800 text-slate-200";
-              let badgeStyle = "bg-slate-800 text-slate-300";
+              let buttonStyle = isFocusQuestion
+                ? "bg-slate-950 hover:bg-amber-950/50 border-amber-500/30 text-slate-200"
+                : "bg-slate-950 hover:bg-slate-800/80 border-slate-800 text-slate-200";
+              let badgeStyle = isFocusQuestion ? "bg-amber-500/20 text-amber-300" : "bg-slate-800 text-slate-300";
 
               if (hasAnsweredCurrent) {
                 if (isCorrectAnswer) {

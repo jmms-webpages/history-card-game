@@ -11,7 +11,8 @@ import { publishSnapshot } from '../utils/publishSnapshot';
 import { AdminEngagementPanel } from './AdminEngagementPanel';
 import { AdminSubmissionsPanel } from './AdminSubmissionsPanel';
 import { AdminClassesPanel } from './AdminClassesPanel';
-import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw } from 'lucide-react';
+import { AdminHonorPanel } from './AdminHonorPanel';
+import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw, Pencil } from 'lucide-react';
 
 interface AdminDashboardViewProps {
   onNavigate?: (tab: NavigationTab) => void;
@@ -27,6 +28,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     gameSettings, 
     updateGameSettings, 
     addQuestion, 
+    updateQuestion,
     toggleQuestionActive, 
     deleteQuestion 
   } = useQuestions();
@@ -58,7 +60,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
   const [studentSearch, setStudentSearch] = useState<string>('');
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (): Promise<UserProfile[] | undefined> => {
     if (!isFirebaseConfigured || !db || !collection || !getDocs || !query || !where) return;
     setLoadingStudents(true);
     try {
@@ -73,6 +75,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       } catch {
         // ignore
       }
+      return list;
     } catch (e) {
       console.warn('Student roster fetch notice:', e);
     } finally {
@@ -198,19 +201,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
   const [unitMasteryAverages, setUnitMasteryAverages] = useState([] as { unitId: string; unitName: string; avgPercent: number }[]);
 
-  const refreshLeaderboardSnapshot = async () => {
-    if (!isFirebaseConfigured || !db || !doc || !setDoc || students.length === 0) return;
+  const refreshLeaderboardSnapshot = async (rosterOverride?: UserProfile[]) => {
+    const roster = rosterOverride ?? students;
+    if (!isFirebaseConfigured || !db || !doc || !setDoc || roster.length === 0) return;
     setRefreshingLeaderboard(true);
     try {
       // Builds the Honor Roll, period standings, weekly boards and class-goal
       // totals, and publishes them as the one doc students read.
-      await publishSnapshot(students, cards.filter(c => c.active).length, gameSettings.classes || []);
+      await publishSnapshot(roster, cards.filter(c => c.active).length, gameSettings.classes || []);
       setLeaderboardUpdatedAt(new Date().toLocaleString());
 
       // Class Mastery by Unit -- a free byproduct of data already in hand,
       // sorted worst-first so it's easy to spot what needs reteaching.
       const unitTotals: Record<string, { sum: number; count: number }> = {};
-      students.forEach(s => {
+      roster.forEach(s => {
         INITIAL_UNITS.forEach(u => {
           const points = s.unitMastery?.[u.unitId] || 0;
           if (!unitTotals[u.unitId]) unitTotals[u.unitId] = { sum: 0, count: 0 };
@@ -235,6 +239,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     }
   };
 
+  // Loads every student's latest numbers, then publishes them in one go.
+  const refreshAndPublish = async () => {
+    const list = await fetchStudents();
+    await refreshLeaderboardSnapshot(list);
+    return list;
+  };
+
   // Economy state
   const [dailyLimit, setDailyLimit] = useState(gameSettings.dailyQuestionLimit);
   const [correctReward, setCorrectReward] = useState(gameSettings.correctCoinReward);
@@ -246,6 +257,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [filterUnit, setFilterUnit] = useState<string>('all');
   const [questionSearch, setQuestionSearch] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [newQText, setNewQText] = useState('');
   const [newAnswers, setNewAnswers] = useState(['', '', '', '']);
   const [newCorrectIdx, setNewCorrectIdx] = useState(0);
@@ -274,9 +286,54 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     setTimeout(() => setSavedNotice(false), 3000);
   };
 
+  const closeQuestionModal = () => {
+    setShowAddModal(false);
+    setEditingQuestionId(null);
+    setNewQText('');
+    setNewAnswers(['', '', '', '']);
+    setNewCorrectIdx(0);
+    setNewExplanation('');
+    setNewTopic('');
+    setNewIsOST(false);
+  };
+
+  const startEditQuestion = (q: Question) => {
+    setEditingQuestionId(q.questionId);
+    setNewQText(q.questionText);
+    setNewAnswers([...q.answers, '', '', '', ''].slice(0, 4));
+    setNewCorrectIdx(q.correctAnswer);
+    setNewExplanation(q.explanation || '');
+    setNewUnitId(q.unitId);
+    setNewStandardId(q.standardId);
+    setNewDifficulty(q.difficulty);
+    setNewTopic(q.topic || '');
+    setNewIsOST(!!q.isOST);
+    setShowAddModal(true);
+  };
+
   const handleCreateQuestion = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQText.trim() || newAnswers.some(a => !a.trim())) return;
+
+    if (editingQuestionId) {
+      const unit = INITIAL_UNITS.find(u => u.unitId === newUnitId);
+      const standard = INITIAL_STANDARDS.find(s => s.standardId === newStandardId);
+      updateQuestion(editingQuestionId, {
+        questionText: newQText.trim(),
+        answers: newAnswers.map(a => a.trim()),
+        correctAnswer: newCorrectIdx,
+        explanation: newExplanation.trim() || 'Review your notes on this topic to learn more.',
+        unitId: newUnitId,
+        unitName: unit?.unitName || 'Custom Unit',
+        standardId: newStandardId,
+        standardDescription: standard?.standardDescription,
+        topic: newTopic.trim() || 'Ohio History Concepts',
+        difficulty: newDifficulty,
+        isOST: newIsOST
+      });
+      closeQuestionModal();
+      return;
+    }
 
     const unitObj = INITIAL_UNITS.find(u => u.unitId === newUnitId);
     const standardObj = INITIAL_STANDARDS.find(s => s.standardId === newStandardId);
@@ -297,12 +354,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       isOST: newIsOST
     });
 
-    setNewQText('');
-    setNewAnswers(['', '', '', '']);
-    setNewExplanation('');
-    setNewTopic('');
-    setNewIsOST(false);
-    setShowAddModal(false);
+    closeQuestionModal();
   };
 
   const filteredQuestions = questions.filter(q => {
@@ -408,7 +460,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           }
         />
       )}
-      {activeSubTab === 'engagement' && <AdminEngagementPanel students={students} />}
+      {activeSubTab === 'honor' && (
+        <AdminHonorPanel
+          students={students}
+          busy={refreshingLeaderboard || loadingStudents}
+          lastPublished={leaderboardUpdatedAt}
+          onRefreshAndPublish={refreshAndPublish}
+        />
+      )}
+      {activeSubTab === 'engagement' && <AdminEngagementPanel />}
       {activeSubTab === 'submissions' && <AdminSubmissionsPanel />}
 
       {/* Students Roster Tab */}
@@ -454,7 +514,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               </button>
               <button
                 type="button"
-                onClick={refreshLeaderboardSnapshot}
+                onClick={() => refreshLeaderboardSnapshot()}
                 disabled={refreshingLeaderboard || students.length === 0}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50"
                 title="Publish today's rankings to the Honor Roll -- students won't see any change until you click this."
@@ -787,6 +847,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                       className="p-1.5 text-xs text-slate-400 hover:text-amber-400 cursor-pointer"
                     >
                       {q.active ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startEditQuestion(q)}
+                      title="Edit question"
+                      className="p-1.5 text-xs text-slate-400 hover:text-amber-400 cursor-pointer"
+                    >
+                      <Pencil className="w-4 h-4" />
                     </button>
                     {q.questionId.startsWith('q-custom-') && (
                       <button
@@ -1143,10 +1211,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-slate-100 text-base">Add New Ohio History Question</h3>
+              <h3 className="font-bold text-slate-100 text-base">{editingQuestionId ? 'Edit Question' : 'Add New Ohio History Question'}</h3>
               <button
                 type="button"
-                onClick={() => setShowAddModal(false)}
+                onClick={closeQuestionModal}
                 className="text-slate-400 hover:text-white text-xs cursor-pointer"
               >
                 ✕ Cancel
@@ -1297,7 +1365,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeQuestionModal}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl cursor-pointer"
                 >
                   Cancel
@@ -1306,7 +1374,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                   type="submit"
                   className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer"
                 >
-                  Save to Question Bank
+                  {editingQuestionId ? 'Save Changes' : 'Save to Question Bank'}
                 </button>
               </div>
             </form>

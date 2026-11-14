@@ -46,7 +46,11 @@ interface QuestionsContextType {
   isDailyLimitReached: boolean;
   practiceMode: boolean;
   setPracticeMode: (enabled: boolean) => void;
+  // Units chosen for practice; empty means all units.
+  practiceUnitIds: string[];
+  setPracticeUnitIds: (ids: string[]) => void;
   addQuestion: (question: Omit<Question, 'questionId'>) => void;
+  updateQuestion: (questionId: string, changes: Partial<Question>) => void;
   toggleQuestionActive: (questionId: string) => void;
   deleteQuestion: (questionId: string) => void;
   resetDailyActivity: () => void;
@@ -317,9 +321,30 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [reviewIndex, setReviewIndex] = useState<number>(0);
   const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
   const [hasAnsweredCurrent, setHasAnsweredCurrent] = useState<boolean>(false);
+  // The question on screen is pinned once answered. Without this, a correct
+  // review answer removes the question from the queue straight away and the
+  // screen would swap to a different question mid-feedback.
+  const [pinnedQuestion, setPinnedQuestion] = useState<Question | null>(null);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [streak, setStreak] = useState<number>(0);
-  const [practiceMode, setPracticeMode] = useState<boolean>(false);
+  const [practiceMode, setPracticeModeState] = useState<boolean>(false);
+  const [practiceUnitIds, setPracticeUnitIdsState] = useState<string[]>([]);
+  const [practiceIndex, setPracticeIndex] = useState<number>(0);
+
+  const resetAnswerState = () => {
+    setHasAnsweredCurrent(false);
+    setPinnedQuestion(null);
+    setLastResult(null);
+    setPracticeIndex(0);
+  };
+  const setPracticeMode = (enabled: boolean) => {
+    setPracticeModeState(enabled);
+    resetAnswerState();
+  };
+  const setPracticeUnitIds = (ids: string[]) => {
+    setPracticeUnitIdsState(ids);
+    resetAnswerState();
+  };
   const [lastOSTResult, setLastOSTResult] = useState<AnswerResult | null>(null);
 
   // Regular daily trivia pool excludes OST questions -- those live in their
@@ -333,6 +358,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return seededShuffle(activeQuestions, seed);
   }, [activeQuestions, userProfile?.uid, todayKey]);
 
+  // Practice pool: the chosen units (or all), shuffled once per day per choice.
+  const practiceQuestions = useMemo(() => {
+    const pool = practiceUnitIds.length > 0 ? activeQuestions.filter(q => practiceUnitIds.includes(q.unitId)) : activeQuestions;
+    return seededShuffle(pool, hashSeed(`${userProfile?.uid || 'guest'}_${todayKey}_practice_${[...practiceUnitIds].sort().join(',')}`));
+  }, [activeQuestions, practiceUnitIds, userProfile?.uid, todayKey]);
+
   const todaysOSTQuestion = useMemo(() => {
     return questions.find(q => q.isOST && q.active) || null;
   }, [questions]);
@@ -344,15 +375,20 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [reviewQueueIds, questions]);
 
   const currentQuestion = useMemo(() => {
+    if (hasAnsweredCurrent && pinnedQuestion) return pinnedQuestion;
     if (isReviewMode) {
       if (reviewQuestions.length === 0) return null;
       const idx = reviewIndex % reviewQuestions.length;
       return reviewQuestions[idx];
     }
+    if (practiceMode) {
+      if (practiceQuestions.length === 0) return null;
+      return practiceQuestions[practiceIndex % practiceQuestions.length];
+    }
     if (dailyShuffledQuestions.length === 0) return null;
     const index = currentQuestionIndex % dailyShuffledQuestions.length;
     return dailyShuffledQuestions[index] || dailyShuffledQuestions[0];
-  }, [isReviewMode, reviewQuestions, reviewIndex, dailyShuffledQuestions, currentQuestionIndex]);
+  }, [isReviewMode, reviewQuestions, reviewIndex, dailyShuffledQuestions, currentQuestionIndex, hasAnsweredCurrent, pinnedQuestion, practiceMode, practiceQuestions, practiceIndex]);
 
   const isDailyLimitReached = useMemo(() => {
     return dailyActivity.questionsAnswered >= gameSettings.dailyQuestionLimit;
@@ -369,12 +405,14 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsReviewMode(true);
     setReviewIndex(0);
     setHasAnsweredCurrent(false);
+    setPinnedQuestion(null);
     setLastResult(null);
   };
 
   const exitReviewMode = () => {
     setIsReviewMode(false);
     setHasAnsweredCurrent(false);
+    setPinnedQuestion(null);
     setLastResult(null);
   };
 
@@ -383,6 +421,31 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const isCorrect = answerIndex === currentQuestion.correctAnswer;
     const unitId = currentQuestion.unitId;
+
+    // Practice is for learning only: no coins, no mastery, no counters, and a
+    // wrong answer is NOT added to Review. It just moves on.
+    if (practiceMode && !isReviewMode) {
+      if (isCorrect) {
+        sounds.playCorrect();
+        setStreak(s => s + 1);
+      } else {
+        sounds.playEffort();
+        setStreak(0);
+      }
+      const practiceResult: AnswerResult = {
+        isCorrect,
+        correctAnswerIndex: currentQuestion.correctAnswer,
+        explanation: currentQuestion.explanation,
+        coinsAwarded: 0,
+        isDailyCapReached: false,
+        masteryDelta: 0,
+        isReviewMode: false
+      };
+      setLastResult(practiceResult);
+      setPinnedQuestion(currentQuestion);
+      setHasAnsweredCurrent(true);
+      return practiceResult;
+    }
 
     let coinsAwarded = 0;
     let masteryDelta = 0;
@@ -466,6 +529,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     setLastResult(result);
+    setPinnedQuestion(currentQuestion);
     setHasAnsweredCurrent(true);
     return result;
   };
@@ -507,10 +571,16 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const nextQuestion = () => {
+    const graduated = isReviewMode && lastResult?.isCorrect === true;
     setHasAnsweredCurrent(false);
+    setPinnedQuestion(null);
     setLastResult(null);
     if (isReviewMode) {
-      setReviewIndex(prev => prev + 1);
+      // A graduated question already left the queue, so the next one now sits
+      // at this same position; only step forward after a miss.
+      if (!graduated) setReviewIndex(prev => prev + 1);
+    } else if (practiceMode) {
+      setPracticeIndex(prev => prev + 1);
     } else {
       setCurrentQuestionIndex(prev => prev + 1);
     }
@@ -524,6 +594,17 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (isFirebaseConfigured && db && doc && setDoc) {
       const qRef = doc(db, 'questions', questionId);
       setDoc(qRef, fullQuestion).catch(e => console.warn('Question sync notice:', e));
+    }
+  };
+
+  // Edits any question (built-in or custom). The full edited question is
+  // saved so every student's device picks the new wording up.
+  const updateQuestion = (questionId: string, changes: Partial<Question>) => {
+    const updated = questions.map(q => (q.questionId === questionId ? { ...q, ...changes, questionId } : q));
+    saveQuestions(updated);
+    const full = updated.find(q => q.questionId === questionId);
+    if (full && isFirebaseConfigured && db && doc && setDoc) {
+      setDoc(doc(db, 'questions', questionId), full, { merge: true }).catch(e => console.warn('Question sync notice:', e));
     }
   };
 
@@ -600,7 +681,10 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isDailyLimitReached,
         practiceMode,
         setPracticeMode,
+        practiceUnitIds,
+        setPracticeUnitIds,
         addQuestion,
+        updateQuestion,
         toggleQuestionActive,
         deleteQuestion,
         resetDailyActivity,
