@@ -66,9 +66,14 @@ export const ADMIN_EMAILS = [
   'jaf2jc@jackson.sparcc.org'
 ];
 
+// TEMPORARY testing bypass: exact addresses only. Remove when testing is done
+// (and keep firestore.rules in sync).
+export const TEST_EMAILS = ['alexandra.finch@nw.sparcc.org'];
+
 export const isAllowedEmailDomain = (email?: string | null): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
+  if (TEST_EMAILS.includes(normalized)) return true;
   return ALLOWED_EMAIL_DOMAINS.some(domain => normalized.endsWith(`@${domain}`));
 };
 
