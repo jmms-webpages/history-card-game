@@ -144,6 +144,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // One shared "class binder" doc per class period. Students can only ADD
+    // cards to it (the new card map must contain every card already there),
+    // so a donation can never erase the class's progress.
+    match /classBinders/{classCode} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() &&
+        request.resource.data.keys().hasOnly(['cards']) &&
+        request.resource.data.cards.size() <= 300 &&
+        (resource == null || request.resource.data.cards.keys().hasAll(resource.data.cards.keys()));
+      allow delete: if isAdmin();
+    }
+
+    // Student-written questions. A student writes only their own doc; the
+    // teacher's decisions live in /approvals, which students can read but
+    // never write -- so a student can't approve their own question.
+    match /submissions/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if (isOwner(userId) &&
+        request.resource.data.keys().hasOnly(['uid', 'displayName', 'items']) &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() <= 20) || isAdmin();
+    }
+
+    match /approvals/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Teacher-only working data (e.g. the weekly-competition baseline).
+    match /adminData/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     // Content: Questions, Cards, Packs, Units, Standards
     match /questions/{questionId} {
       allow read: if isAuthenticated();

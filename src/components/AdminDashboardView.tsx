@@ -6,6 +6,9 @@ import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
 import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
+import { publishSnapshot } from '../utils/publishSnapshot';
+import { AdminEngagementPanel } from './AdminEngagementPanel';
+import { AdminSubmissionsPanel } from './AdminSubmissionsPanel';
 import { ShieldCheck, Settings, HelpCircle, BookOpen, Sliders, Plus, Check, Trash2, ToggleLeft, ToggleRight, Filter, Package, Eye, Users, Award, Search, RefreshCw } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -30,7 +33,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     togglePackActive
   } = useCards();
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'students' | 'questions' | 'cards' | 'packs' | 'economy' | 'units' | 'standards'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'students' | 'questions' | 'cards' | 'packs' | 'economy' | 'units' | 'standards' | 'engagement' | 'submissions'>('overview');
 
   // Real classroom roster, pulled live from Firestore -- every account
   // that has ever signed in shows up here, not a hardcoded sample list.
@@ -123,27 +126,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     if (!isFirebaseConfigured || !db || !doc || !setDoc || students.length === 0) return;
     setRefreshingLeaderboard(true);
     try {
-      const ranked = [...students]
-        .sort((a, b) =>
-          (b.uniqueCardsCollected || 0) - (a.uniqueCardsCollected || 0) ||
-          (b.totalCardsCollected || 0) - (a.totalCardsCollected || 0)
-        )
-        .slice(0, 50)
-        .map(s => ({
-          uid: s.uid,
-          displayName: s.displayName,
-          avatar: s.avatar,
-          classroomCode: s.classroomCode,
-          coins: s.coins,
-          uniqueCardsCollected: s.uniqueCardsCollected || 0,
-          totalCardsCollected: s.totalCardsCollected || 0
-        }));
-
-      const snapshotRef = doc(db, 'leaderboard', 'snapshot');
-      await setDoc(snapshotRef, {
-        entries: ranked,
-        generatedAt: new Date().toISOString()
-      });
+      // Builds the Honor Roll, period standings, weekly boards and class-goal
+      // totals, and publishes them as the one doc students read.
+      await publishSnapshot(students, cards.filter(c => c.active).length);
       setLeaderboardUpdatedAt(new Date().toLocaleString());
 
       // Class Mastery by Unit -- a free byproduct of data already in hand,
@@ -397,6 +382,28 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <span>Classroom Economy & Daily Caps</span>
           </button>
           <button
+            id="admin-subtab-engagement"
+            type="button"
+            onClick={() => setActiveSubTab('engagement')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'engagement' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Engagement &amp; Competition</span>
+          </button>
+          <button
+            id="admin-subtab-submissions"
+            type="button"
+            onClick={() => setActiveSubTab('submissions')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'submissions' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Student Questions</span>
+          </button>
+          <button
             id="admin-subtab-units"
             type="button"
             onClick={() => setActiveSubTab('units')}
@@ -420,6 +427,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           </button>
         </div>
       </div>
+
+      {activeSubTab === 'engagement' && <AdminEngagementPanel students={students} />}
+      {activeSubTab === 'submissions' && <AdminSubmissionsPanel />}
 
       {/* Students Roster Tab */}
       {activeSubTab === 'students' && (

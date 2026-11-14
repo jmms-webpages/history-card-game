@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavigationTab } from '../types';
 import { getAvatarById } from '../data/avatars';
-import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight } from 'lucide-react';
+import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -30,6 +30,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'packs', label: 'Card Packs', icon: <Package className="w-4 h-4" /> },
     { id: 'collection', label: 'Card Binder', icon: <Library className="w-4 h-4" /> },
     { id: 'leaderboard', label: 'Honor Roll', icon: <Trophy className="w-4 h-4" /> },
+    { id: 'classbinder', label: 'Class Binder', icon: <Users className="w-4 h-4" /> },
+    { id: 'contribute', label: 'Write a Question', icon: <Pencil className="w-4 h-4" /> },
     { id: 'profile', label: 'My Scholar Profile', icon: <User className="w-4 h-4" /> }
   ];
 

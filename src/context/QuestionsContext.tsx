@@ -389,10 +389,17 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     if (isReviewMode) {
       masteryDelta = isCorrect ? MASTERY_CORRECT_GAIN : 0;
+      // Clearing a missed question earns a small bonus (teacher can set it to 0).
+      coinsAwarded = isCorrect ? (gameSettings.reviewCoinReward ?? 0) : 0;
     } else {
       const willHitCap = !practiceMode && isDailyLimitReached;
       if (!willHitCap) {
-        coinsAwarded = isCorrect ? gameSettings.correctCoinReward : gameSettings.incorrectCoinReward;
+        // Unit Focus: correct answers in the teacher's focus unit pay extra.
+        const isFocusUnit = !!gameSettings.focusUnitId && unitId === gameSettings.focusUnitId;
+        const correctReward = isFocusUnit
+          ? Math.max(gameSettings.correctCoinReward, gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward)
+          : gameSettings.correctCoinReward;
+        coinsAwarded = isCorrect ? correctReward : gameSettings.incorrectCoinReward;
       }
       masteryDelta = isCorrect ? MASTERY_CORRECT_GAIN : -MASTERY_INCORRECT_PENALTY;
     }

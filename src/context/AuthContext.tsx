@@ -36,7 +36,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithSchoolEmail: (email: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => Promise<void>;
+  updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements' | 'claimedGoalIds' | 'claimedClassMilestones' | 'claimedSubmissionIds' | 'classDonations'>>) => Promise<void>;
   recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   clearError: () => void;
@@ -399,7 +399,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Only avatar & classroomCode are user-editable. displayName, email, and
   // role are intentionally NOT accepted here -- see also firestore.rules,
   // which independently blocks any client attempt to write those fields.
-  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements'>>) => {
+  const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements' | 'claimedGoalIds' | 'claimedClassMilestones' | 'claimedSubmissionIds' | 'classDonations'>>) => {
     const updated = applyProfileUpdate(updates);
     if (!updated) return;
 

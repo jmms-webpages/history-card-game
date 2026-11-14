@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useQuestions } from '../context/QuestionsContext';
 import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { User, Coins, Check, Save, Sparkles, Lock, LogOut, BadgeCheck, Award } from 'lucide-react';
@@ -14,6 +15,7 @@ export const ProfileView: React.FC = () => {
     isStudentViewMode, 
     toggleStudentViewMode 
   } = useAuth();
+  const { gameSettings } = useQuestions();
   
   // Hooks must run on every render, so the null-guard comes AFTER them.
   const [classroomCode, setClassroomCode] = useState(userProfile?.classroomCode ?? '');
@@ -139,13 +141,29 @@ export const ProfileView: React.FC = () => {
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
               Classroom Code
             </label>
-            <input
-              type="text"
-              required
-              value={classroomCode}
-              onChange={(e) => setClassroomCode(e.target.value.toUpperCase())}
-              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
-            />
+            {(gameSettings.periodCodes || []).length > 0 ? (
+              <select
+                required
+                value={classroomCode}
+                onChange={(e) => setClassroomCode(e.target.value.toUpperCase())}
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
+              >
+                {!(gameSettings.periodCodes || []).includes(classroomCode) && (
+                  <option value={classroomCode}>{classroomCode || 'Choose your period...'}</option>
+                )}
+                {(gameSettings.periodCodes || []).map(code => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                required
+                value={classroomCode}
+                onChange={(e) => setClassroomCode(e.target.value.toUpperCase())}
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500"
+              />
+            )}
             <p className="text-[11px] text-slate-500 mt-1">
               Your class period code.
             </p>

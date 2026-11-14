@@ -17,6 +17,8 @@ import { CollectionView } from './components/CollectionView';
 import { ProfileView } from './components/ProfileView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { LeaderboardView } from './components/LeaderboardView';
+import { ClassBinderView } from './components/ClassBinderView';
+import { ContributeView } from './components/ContributeView';
 import { Eye } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
@@ -89,6 +91,8 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
           {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
           {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
+          {currentTab === 'classbinder' && <ClassBinderView />}
+          {currentTab === 'contribute' && <ContributeView />}
           {currentTab === 'profile' && <ProfileView />}
           {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}
         </main>

@@ -207,5 +207,31 @@ export const HISTORICAL_ACHIEVEMENTS: Achievement[] = [
       type: 'mythical_pulled',
       target: 1
     }
+  },
+
+  // Class Binder
+  {
+    id: 'class-helper',
+    title: 'Class Helper',
+    description: 'Donate 5 duplicate cards to your class binder.',
+    category: 'collection',
+    icon: '🤝',
+    coinReward: 50,
+    requirement: {
+      type: 'donations',
+      target: 5
+    }
+  },
+  {
+    id: 'class-champion',
+    title: 'Class Champion',
+    description: 'Donate 25 duplicate cards to your class binder.',
+    category: 'collection',
+    icon: '🏅',
+    coinReward: 100,
+    requirement: {
+      type: 'donations',
+      target: 25
+    }
   }
 ];
