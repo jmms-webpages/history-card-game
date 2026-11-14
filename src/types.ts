@@ -160,6 +160,9 @@ export interface GameSettings {
   classroomTimezone: string;
   // Teacher-controlled engagement settings (null / empty = off)
   classes?: ClassInfo[];
+  // Pack ids the teacher has closed. Lives in the settings doc students already
+  // read, so closing a pack costs no extra reads.
+  closedPacks?: string[];
   focusUnitId?: string;
   focusCorrectReward?: number; // 15 or 20
   reviewCoinReward?: number; // 0 or 3

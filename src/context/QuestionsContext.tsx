@@ -158,7 +158,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !doc || !getDoc || isFresh('settings')) return;
+    if (!isFirebaseConfigured || !db || !doc || !getDoc || isFresh('settings', SETTINGS_TTL_MS)) return;
     (async () => {
       try {
         const settingsRef = doc(db, 'settings', 'gameSettings');
@@ -618,6 +618,10 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     </QuestionsContext.Provider>
   );
 };
+
+// Short on purpose: class goals, closed packs and the focus unit should reach
+// students within minutes. It is one document read per student per window.
+const SETTINGS_TTL_MS = 5 * 60 * 1000;
 
 export const useQuestions = () => {
   const context = useContext(QuestionsContext);

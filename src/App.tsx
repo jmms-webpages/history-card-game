@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { useQuestions, QuestionsProvider } from './context/QuestionsContext';
+import { QuestionsProvider } from './context/QuestionsContext';
 import { CardsProvider } from './context/CardsContext';
 import { NavigationTab } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -25,7 +25,6 @@ import { Eye } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { userProfile, loading, isStudentViewMode, setStudentViewMode, isAdmin } = useAuth();
-  const { gameSettings } = useQuestions();
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
   const [timedOut, setTimedOut] = useState(false);
 
@@ -55,7 +54,7 @@ const MainAppContent: React.FC = () => {
   }
 
   // Students finish setup (avatar, real name, class) before seeing the dashboard.
-  if (!isAdmin && (!userProfile.nameSet || ((gameSettings.classes || []).length > 0 && isUnassignedClass(userProfile.classroomCode)))) {
+  if (!isAdmin && (!userProfile.nameSet || isUnassignedClass(userProfile.classroomCode))) {
     return <SetupView />;
   }
 
