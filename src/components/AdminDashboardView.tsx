@@ -4,7 +4,7 @@ import { useQuestions } from '../context/QuestionsContext';
 import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS, INITIAL_STANDARDS } from '../data/initialCurriculum';
 import { NavigationTab, Question, UserProfile } from '../types';
-import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc } from '../firebase/config';
+import { isFirebaseConfigured, db, collection, getDocs, query, where, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { publishSnapshot } from '../utils/publishSnapshot';
 import { AdminEngagementPanel } from './AdminEngagementPanel';
@@ -81,6 +81,58 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   }, [isAdmin]);
 
   const [promotingUid, setPromotingUid] = useState<string | null>(null);
+
+  const patchRoster = (uid: string, patch: Partial<UserProfile> | null) =>
+    setStudents(prev => {
+      const next = patch ? prev.map(s => (s.uid === uid ? { ...s, ...patch } : s)) : prev.filter(s => s.uid !== uid);
+      try {
+        localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+
+  const renameStudent = async (student: UserProfile) => {
+    if (!db || !doc || !updateDoc) return;
+    const input = window.prompt(`New name for ${student.displayName}:`, student.displayName);
+    const name = (input || '').trim().replace(/\s+/g, ' ');
+    if (!name || name === student.displayName) return;
+    try {
+      await updateDoc(doc(db, 'users', student.uid), { displayName: name, nameSet: true });
+      patchRoster(student.uid, { displayName: name, nameSet: true });
+    } catch (e) {
+      console.warn('Rename notice:', e);
+      window.alert('Could not rename this student -- check your connection and try again.');
+    }
+  };
+
+  // Makes the student type their name again the next time they open the site.
+  const requireNewName = async (student: UserProfile) => {
+    if (!db || !doc || !updateDoc) return;
+    if (!window.confirm(`Make ${student.displayName} enter their name again on their next visit?`)) return;
+    try {
+      await updateDoc(doc(db, 'users', student.uid), { nameSet: false });
+      patchRoster(student.uid, { nameSet: false });
+    } catch (e) {
+      console.warn('Reset name notice:', e);
+      window.alert('Could not reset this name -- check your connection and try again.');
+    }
+  };
+
+  // Deletes the profile (coins, cards and class). If the student signs in
+  // again they start over as a brand-new student and go through setup.
+  const removeStudent = async (student: UserProfile) => {
+    if (!db || !doc || !deleteDoc) return;
+    if (!window.confirm(`Remove ${student.displayName}?\n\nTheir profile, coins and cards are deleted. If they sign in again they start fresh.`)) return;
+    try {
+      await deleteDoc(doc(db, 'users', student.uid));
+      patchRoster(student.uid, null);
+    } catch (e) {
+      console.warn('Remove student notice:', e);
+      window.alert('Could not remove this student -- check your connection and try again.');
+    }
+  };
 
   const promoteToAdmin = async (student: UserProfile) => {
     if (!isFirebaseConfigured || !db || !doc || !updateDoc) return;
@@ -562,7 +614,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                       <td className="py-3 px-4 text-right text-slate-500 font-mono">
                         {s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : '—'}
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
+                        <button type="button" onClick={() => renameStudent(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 cursor-pointer">Rename</button>
+                        <button type="button" onClick={() => requireNewName(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 cursor-pointer">Reset name</button>
+                        <button type="button" onClick={() => removeStudent(s)} className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 cursor-pointer">Remove</button>
                         <button
                           type="button"
                           onClick={() => promoteToAdmin(s)}

@@ -41,6 +41,7 @@ interface AuthContextType {
   recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
   joinClass: (classCode: string, password: string) => Promise<void>;
+  completeSetup: (displayName: string, avatar: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -245,6 +246,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           remoteConfirmed = true;
           if (snapshot.exists()) {
             existingData = { ...existingData, ...(snapshot.data() as Partial<UserProfile>) };
+          } else {
+            // The server says there is no profile (new account, or a teacher
+            // removed it): a stale local cache must not bring it back.
+            existingData = {};
           }
         }
       } catch (e) {
@@ -260,14 +265,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // an admin (via the Admin Console / Firestore) -- never by the user.
     const role: UserRole = isAdminUser ? 'admin' : 'student';
 
-    const displayName = deriveDisplayName(
-      googleDisplayName,
-      isAdminUser ? 'Teacher & Director' : '8th Grade Student'
-    );
+    // A name the student typed in setup (or a teacher set) wins over the Google name.
+    const displayName =
+      existingData.nameSet && existingData.displayName
+        ? existingData.displayName
+        : deriveDisplayName(googleDisplayName, isAdminUser ? 'Teacher & Director' : '8th Grade Student');
 
     const combinedProfile: UserProfile = {
       uid,
       displayName,
+      // Only written when true, so a login sync never counts as a name change.
+      ...(existingData.nameSet === true ? { nameSet: true } : {}),
       avatar: existingData.avatar || (isAdminUser ? 'washington' : 'franklin'),
       classroomCode: existingData.classroomCode || '',
       role,
@@ -413,6 +421,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // First-time setup: the student's typed real name and avatar. The rules only
+  // allow this while the name is not yet set; afterwards only a teacher can
+  // change it. Waits for the server so a rejection shows up on the setup screen.
+  const completeSetup = async (displayName: string, avatar: string): Promise<void> => {
+    const base = userProfileRef.current;
+    if (!base) throw new Error('You need to be signed in.');
+    const name = displayName.trim().replace(/\s+/g, ' ');
+    if (isFirebaseConfigured && db && doc) {
+      try {
+        await updateDoc(doc(db, 'users', base.uid), { displayName: name, nameSet: true, avatar });
+      } catch (e: any) {
+        if (e?.code === 'permission-denied') {
+          throw new Error('Could not save your name. Ask your teacher.');
+        }
+        throw new Error('Could not reach the server. Check your connection and try again.');
+      }
+    }
+    applyProfileUpdate({ displayName: name, nameSet: true, avatar });
+  };
+
   // Joining a class is checked by firestore.rules against the teacher-set
   // password, so unlike other profile edits we WAIT for the server and only
   // update the local profile if it accepted. A wrong password changes nothing.
@@ -501,6 +529,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       updateUserProfile,
       joinClass,
+      completeSetup,
       updateCoins,
       clearError: () => setError(null)
     }}>

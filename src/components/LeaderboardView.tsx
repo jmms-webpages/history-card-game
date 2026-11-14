@@ -22,6 +22,7 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
+import { AvatarFace } from './AvatarFace';
 
 interface LeaderboardEntry {
   uid: string;
@@ -343,8 +344,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
 
                   <div className="relative mt-2 mb-3">
                     <Crown className={`w-6 h-6 absolute -top-4 left-1/2 -translate-x-1/2 ${placeStyles.crown}`} />
-                    <div className={`w-16 h-16 rounded-2xl ${avatar.color} flex items-center justify-center text-3xl shadow-lg border-2 border-slate-700`}>
-                      {avatar.badge}
+                    <div className={`w-16 h-16 rounded-2xl ${avatar.color} overflow-hidden flex items-center justify-center text-3xl shadow-lg border-2 border-slate-700`}>
+                      <AvatarFace avatar={avatar} />
                     </div>
                   </div>
 
@@ -414,8 +415,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                         
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg ${avatar.color} flex items-center justify-center text-base shrink-0 shadow`}>
-                              {avatar.badge}
+                            <div className={`w-8 h-8 rounded-lg ${avatar.color} overflow-hidden flex items-center justify-center text-base shrink-0 shadow`}>
+                              <AvatarFace avatar={avatar} />
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">

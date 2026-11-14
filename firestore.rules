@@ -114,7 +114,18 @@ service cloud.firestore {
       // would add reads to every single student write.
       allow update: if (
         isOwner(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'displayName', 'email']) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'email']) &&
+        // The typed real name can be set once; after that only a teacher can change it.
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName', 'nameSet']) ||
+          (
+            resource.data.get('nameSet', false) != true &&
+            request.resource.data.nameSet == true &&
+            request.resource.data.displayName is string &&
+            request.resource.data.displayName.size() >= 3 &&
+            request.resource.data.displayName.size() <= 40
+          )
+        ) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['coins']) ||
           isAllowedCoinDelta(request.resource.data.coins - resource.data.coins)

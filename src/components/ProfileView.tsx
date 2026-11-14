@@ -5,6 +5,7 @@ import { HISTORICAL_AVATARS, getAvatarById } from '../data/avatars';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { isUnassignedClass, classLabel } from '../utils/classes';
 import { User, Coins, Check, Save, Sparkles, Lock, LogOut, BadgeCheck, Award } from 'lucide-react';
+import { AvatarFace } from './AvatarFace';
 
 export const ProfileView: React.FC = () => {
   const { 
@@ -71,8 +72,8 @@ export const ProfileView: React.FC = () => {
       {/* Profile Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <div className={`w-24 h-24 rounded-3xl ${currentAvatar.color} flex items-center justify-center text-5xl shadow-2xl border-2 border-amber-400/40 shrink-0`}>
-            {currentAvatar.badge}
+          <div className={`w-24 h-24 rounded-3xl ${currentAvatar.color} overflow-hidden flex items-center justify-center text-5xl shadow-2xl border-2 border-amber-400/40 shrink-0`}>
+            <AvatarFace avatar={currentAvatar} />
           </div>
 
           <div className="flex-1 text-center sm:text-left">
@@ -196,7 +197,7 @@ export const ProfileView: React.FC = () => {
               <span>{userProfile.displayName}</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Set from your school Google account.
+              Ask your teacher if it needs to change.
             </p>
           </div>
 
@@ -237,8 +238,8 @@ export const ProfileView: React.FC = () => {
                       : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-xl ${avatar.color} flex items-center justify-center text-xl shrink-0 shadow`}>
-                    {avatar.badge}
+                  <div className={`w-10 h-10 rounded-xl ${avatar.color} overflow-hidden flex items-center justify-center text-xl shrink-0 shadow`}>
+                    <AvatarFace avatar={avatar} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">

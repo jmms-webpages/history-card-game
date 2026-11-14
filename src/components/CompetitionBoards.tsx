@@ -5,6 +5,7 @@ import { Snapshot, WeeklyEntry } from '../utils/snapshot';
 import { ClassGoalCard } from './EngagementBanners';
 import { useQuestions } from '../context/QuestionsContext';
 import { classLabel } from '../utils/classes';
+import { AvatarFace } from './AvatarFace';
 
 type BoardView = 'week' | 'periods' | 'teachers';
 type PeriodMetric = 'mastery' | 'binder' | 'classBinder';
@@ -33,7 +34,7 @@ const WeeklyList: React.FC<{
               <span className="w-6 text-center font-mono font-bold text-slate-400">
                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
               </span>
-              <span className={`w-7 h-7 rounded-lg ${avatar.color} flex items-center justify-center text-sm shrink-0`}>{avatar.badge}</span>
+              <span className={`w-7 h-7 rounded-lg ${avatar.color} overflow-hidden flex items-center justify-center text-sm shrink-0`}><AvatarFace avatar={avatar} /></span>
               <span className="flex-1 font-bold text-slate-100 truncate">
                 {row.displayName}
                 {isMe && <span className="ml-1.5 text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1 rounded font-mono">YOU</span>}
