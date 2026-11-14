@@ -91,7 +91,7 @@ const MainAppContent: React.FC = () => {
           {currentTab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
           {currentTab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
           {currentTab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
-          {currentTab === 'classbinder' && <ClassBinderView />}
+          {currentTab === 'classbinder' && <ClassBinderView onNavigate={setCurrentTab} />}
           {currentTab === 'contribute' && <ContributeView />}
           {currentTab === 'profile' && <ProfileView />}
           {currentTab === 'admin' && <AdminDashboardView onNavigate={setCurrentTab} />}

@@ -165,7 +165,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
     'jaf2jc@jackson.sparcc.org'
   ],
   classroomTimezone: 'America/New_York', // Ohio Eastern Time
-  periodCodes: [],
+  classes: [],
   focusUnitId: '',
   focusCorrectReward: 15,
   reviewCoinReward: 3,

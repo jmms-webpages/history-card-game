@@ -1,8 +1,9 @@
 import { isFirebaseConfigured, db, doc, getDoc, setDoc, collection, getDocs } from '../firebase/config';
-import { UserProfile } from '../types';
+import { UserProfile, ClassInfo } from '../types';
+import { isUnassignedClass } from './classes';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
-import { Snapshot, WeeklyEntry } from './snapshot';
+import { Snapshot, WeeklyEntry, PeriodStat, TeacherStat } from './snapshot';
 
 // Teacher-only helpers. Everything here runs when YOU click a button, never
 // automatically, so student traffic never triggers these reads.
@@ -31,7 +32,11 @@ export const startNewWeek = async (students: UserProfile[]): Promise<string> => 
   return startedAt;
 };
 
-export const publishSnapshot = async (students: UserProfile[], totalCardsInSet: number): Promise<Snapshot> => {
+export const publishSnapshot = async (
+  students: UserProfile[],
+  totalCardsInSet: number,
+  classes: ClassInfo[]
+): Promise<Snapshot> => {
   if (!isFirebaseConfigured || !db || !doc || !setDoc || !getDoc || !collection || !getDocs) {
     throw new Error('Firebase is not configured.');
   }
@@ -64,29 +69,48 @@ export const publishSnapshot = async (students: UserProfile[], totalCardsInSet: 
       totalCardsCollected: s.totalCardsCollected || 0
     }));
 
-  // Period standings use AVERAGES per student, so a bigger class has no edge.
-  const groups: Record<string, UserProfile[]> = {};
-  students.forEach(s => {
-    const code = (s.classroomCode || 'UNASSIGNED').trim().toUpperCase();
-    (groups[code] = groups[code] || []).push(s);
-  });
-  const unitCount = Math.max(1, INITIAL_UNITS.length);
-  const periods = Object.entries(groups)
-    .map(([code, list]) => {
-      const n = list.length;
-      const avgMastery = list.reduce((sum, s) => sum + masterySum(s) / (unitCount * MASTERY_TARGET_POINTS), 0) / n;
-      const avgUnique = list.reduce((sum, s) => sum + (s.uniqueCardsCollected || 0), 0) / n;
-      const avgCorrect = list.reduce((sum, s) => sum + (s.totalCorrectAnswersLifetime || 0), 0) / n;
+  // Standings use AVERAGES per student, so a bigger class or teacher group has
+  // no edge. Students who haven't joined a real class yet are left out.
+  const masteryPct = (s: UserProfile) => (masterySum(s) / (Math.max(1, INITIAL_UNITS.length) * MASTERY_TARGET_POINTS)) * 100;
+  const binderPct = (s: UserProfile) => (totalCardsInSet > 0 ? ((s.uniqueCardsCollected || 0) / totalCardsInSet) * 100 : 0);
+  const mean = (list: UserProfile[], f: (s: UserProfile) => number) =>
+    list.length ? list.reduce((sum, s) => sum + f(s), 0) / list.length : 0;
+  const binderPctFor = (code: string) =>
+    totalCardsInSet > 0 ? Math.round(((binderCounts[code] || 0) / totalCardsInSet) * 100) : 0;
+
+  const periods: PeriodStat[] = classes
+    .map(cls => {
+      const list = students.filter(s => (s.classroomCode || '').trim().toUpperCase() === cls.code);
       return {
-        code,
-        students: n,
-        avgMasteryPct: Math.round(avgMastery * 100),
-        avgBinderPct: totalCardsInSet > 0 ? Math.round((avgUnique / totalCardsInSet) * 100) : 0,
-        avgCorrect: Math.round(avgCorrect),
-        classBinderPct: totalCardsInSet > 0 ? Math.round(((binderCounts[code] || 0) / totalCardsInSet) * 100) : 0
+        code: cls.code,
+        teacher: cls.teacher,
+        name: cls.name,
+        students: list.length,
+        avgMasteryPct: Math.round(mean(list, masteryPct)),
+        avgBinderPct: Math.round(mean(list, binderPct)),
+        avgCorrect: Math.round(mean(list, s => s.totalCorrectAnswersLifetime || 0)),
+        classBinderPct: binderPctFor(cls.code)
       };
     })
-    .sort((a, b) => b.avgMasteryPct - a.avgMasteryPct);
+    .filter(p => p.students > 0)
+    .sort((x, y) => y.avgMasteryPct - x.avgMasteryPct);
+
+  const teacherNames = Array.from(new Set(classes.map(c => c.teacher)));
+  const teachers: TeacherStat[] = teacherNames
+    .map(name => {
+      const codes = classes.filter(c => c.teacher === name).map(c => c.code);
+      const list = students.filter(s => codes.includes((s.classroomCode || '').trim().toUpperCase()));
+      const binderAvg = codes.length ? codes.reduce((sum, c) => sum + binderPctFor(c), 0) / codes.length : 0;
+      return {
+        teacher: name,
+        students: list.length,
+        avgMasteryPct: Math.round(mean(list, masteryPct)),
+        avgBinderPct: Math.round(mean(list, binderPct)),
+        classBinderPct: Math.round(binderAvg)
+      };
+    })
+    .filter(t => t.students > 0)
+    .sort((x, y) => y.avgMasteryPct - x.avgMasteryPct);
 
   // Weekly boards: gain since the baseline you set with "Start New Week".
   // Students with no baseline (joined mid-week) count from zero gain.
@@ -115,7 +139,7 @@ export const publishSnapshot = async (students: UserProfile[], totalCardsInSet: 
     cards: students.reduce((sum, s) => sum + (s.uniqueCardsCollected || 0), 0)
   };
 
-  const snapshot: Snapshot = { entries, periods, weekly, totals, generatedAt: new Date().toISOString() };
+  const snapshot: Snapshot = { entries, periods, teachers, weekly, totals, generatedAt: new Date().toISOString() };
   await setDoc(doc(db, 'leaderboard', 'snapshot'), snapshot);
   return snapshot;
 };

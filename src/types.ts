@@ -24,6 +24,9 @@ export interface UserProfile {
   claimedClassMilestones?: string[];
   claimedSubmissionIds?: string[];
   classDonations?: number;
+  // Hash proving the student entered the right class password when joining
+  // (checked by firestore.rules). Never the password itself.
+  joinProof?: string;
 }
 
 export interface DailyActivity {
@@ -130,6 +133,14 @@ export interface ClassGoal {
   startedAt: string;
 }
 
+// A real class the teachers set up in Admin -> Classes. Students join one with
+// a teacher-set password.
+export interface ClassInfo {
+  code: string; // e.g. JORDEN-3 (also the classBinders doc id)
+  teacher: string; // e.g. Jorden
+  name: string; // e.g. Period 3
+}
+
 export interface UpcomingTest {
   label: string;
   date: string; // YYYY-MM-DD
@@ -146,7 +157,7 @@ export interface GameSettings {
   adminUids: string[];
   classroomTimezone: string;
   // Teacher-controlled engagement settings (null / empty = off)
-  periodCodes?: string[];
+  classes?: ClassInfo[];
   focusUnitId?: string;
   focusCorrectReward?: number; // 15 or 20
   reviewCoinReward?: number; // 0 or 3

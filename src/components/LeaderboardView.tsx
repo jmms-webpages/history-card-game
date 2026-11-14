@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useCards } from '../context/CardsContext';
 import { HISTORICAL_ACHIEVEMENTS } from '../data/achievements';
 import { getAvatarById } from '../data/avatars';
+import { useQuestions } from '../context/QuestionsContext';
+import { isUnassignedClass, classLabel } from '../utils/classes';
 import { Snapshot, fetchSnapshot } from '../utils/snapshot';
 import { CompetitionBoards } from './CompetitionBoards';
 import { Achievement } from '../types';
@@ -39,6 +41,7 @@ const MAX_LEADERBOARD_ROWS = 25;
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
+  const { gameSettings } = useQuestions();
   const { inventoryCards, stats } = useCards();
 
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'boards' | 'achievements'>('leaderboard');
@@ -86,7 +89,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
     uid: userProfile?.uid || 'current-user',
     displayName: userProfile?.displayName || 'You',
     avatar: userProfile?.avatar || 'pioneer',
-    classroomCode: userProfile?.classroomCode || 'JMMS-8TH-2026',
+    classroomCode: userProfile?.classroomCode || '',
     coins: userProfile?.coins || 0,
     uniqueCards: stats.uniqueCards,
     totalCards: inventoryCards.length
@@ -200,7 +203,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                 Classroom Honor Roll
               </span>
               <span className="text-xs font-mono text-slate-400 bg-slate-950 px-2.5 py-0.5 rounded-full border border-slate-800">
-                Code: {userProfile?.classroomCode || 'JMMS-8TH-2026'}
+                {isUnassignedClass(userProfile?.classroomCode) ? 'No class yet' : classLabel(gameSettings.classes || [], userProfile?.classroomCode || '')}
               </span>
             </div>
             
@@ -374,7 +377,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigateTab 
                 <span>Top {sortedStudents.length} Scholars</span>
               </h2>
               <span className="text-xs text-slate-500 font-mono">
-                {userProfile?.classroomCode}
+                {classLabel(gameSettings.classes || [], userProfile?.classroomCode || '')}
               </span>
             </div>
 

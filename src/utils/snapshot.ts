@@ -24,6 +24,8 @@ export interface WeeklyEntry {
 
 export interface PeriodStat {
   code: string;
+  teacher: string;
+  name: string;
   students: number;
   avgMasteryPct: number;
   avgBinderPct: number;
@@ -31,9 +33,18 @@ export interface PeriodStat {
   classBinderPct: number;
 }
 
+export interface TeacherStat {
+  teacher: string;
+  students: number;
+  avgMasteryPct: number;
+  avgBinderPct: number;
+  classBinderPct: number;
+}
+
 export interface Snapshot {
   entries: SnapshotEntry[];
   periods: PeriodStat[];
+  teachers: TeacherStat[];
   weekly: {
     startedAt: string | null;
     correct: WeeklyEntry[];
@@ -54,6 +65,7 @@ let inflight: Promise<Snapshot | null> | null = null;
 export const normalizeSnapshot = (raw: any): Snapshot => ({
   entries: Array.isArray(raw?.entries) ? raw.entries : [],
   periods: Array.isArray(raw?.periods) ? raw.periods : [],
+  teachers: Array.isArray(raw?.teachers) ? raw.teachers : [],
   weekly: {
     startedAt: raw?.weekly?.startedAt ?? null,
     correct: raw?.weekly?.correct ?? [],

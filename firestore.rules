@@ -53,6 +53,17 @@ service cloud.firestore {
       ];
     }
 
+    // Joining a class: only allowed while the student has no real class yet,
+    // and only with the right password. The student's browser sends a salted
+    // hash (joinProof); it's compared to the teacher-only copy in
+    // adminData/classKeys, which students can never read directly.
+    function isValidClassJoin() {
+      return resource.data.get('classroomCode', '') in ['', 'OHIO-8A', 'JMMS-8TH-2026'] &&
+        request.resource.data.classroomCode is string &&
+        request.resource.data.joinProof ==
+          get(/databases/$(database)/documents/adminData/classKeys).data.hashes[request.resource.data.classroomCode];
+    }
+
     function isAdmin() {
       return isAuthenticated() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
@@ -108,7 +119,11 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['coins']) ||
           isAllowedCoinDelta(request.resource.data.coins - resource.data.coins)
         ) &&
-        request.resource.data.coins >= 0
+        request.resource.data.coins >= 0 &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classroomCode']) ||
+          isValidClassJoin()
+        )
       ) || isAdmin();
       allow delete: if isAdmin();
 
@@ -149,7 +164,9 @@ service cloud.firestore {
     // so a donation can never erase the class's progress.
     match /classBinders/{classCode} {
       allow read: if isAuthenticated();
+      // Only members of that class (or an admin) may add to its binder.
       allow create, update: if isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classroomCode == classCode || isAdmin()) &&
         request.resource.data.keys().hasOnly(['cards']) &&
         request.resource.data.cards.size() <= 300 &&
         (resource == null || request.resource.data.cards.keys().hasAll(resource.data.cards.keys()));
