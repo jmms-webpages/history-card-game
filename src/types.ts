@@ -20,6 +20,11 @@ export interface UserProfile {
   unitMastery?: Record<string, number>;
   totalQuestionsAnsweredLifetime?: number;
   totalCorrectAnswersLifetime?: number;
+  // Today's daily-question counts, so the teacher overview can total a day
+  // without any extra reads. Reset whenever todayDate is not today.
+  todayDate?: string;
+  todayQuestions?: number;
+  todayCorrect?: number;
   // Engagement features -- all stored on the user doc so they ride along with
   // writes that already happen (no extra reads).
   claimedGoalIds?: string[];
@@ -213,16 +218,4 @@ export type NavigationTab =
   | 'admin'
   | 'student-view';
 
-export type AdminSubTab =
-  | 'overview'
-  | 'students'
-  | 'questions'
-  | 'cards'
-  | 'packs'
-  | 'economy'
-  | 'units'
-  | 'standards'
-  | 'engagement'
-  | 'submissions'
-  | 'classes'
-  | 'honor';
+export type AdminSubTab = 'overview' | 'classes' | 'honor' | 'submissions' | 'questions' | 'cards' | 'packs';

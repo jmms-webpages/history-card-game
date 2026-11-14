@@ -35,17 +35,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, admin
   const adminMode = isAdmin && !isStudentViewMode;
   const adminNavItems: { id: AdminSubTab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'System Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'students', label: `Students (${studentCount})`, icon: <Users className="w-4 h-4" /> },
+    { id: 'classes', label: `Classes & Students (${studentCount})`, icon: <Users className="w-4 h-4" /> },
+    { id: 'honor', label: 'Honor Roll & Goals', icon: <Trophy className="w-4 h-4" /> },
+    { id: 'submissions', label: 'Student Questions', icon: <MessageSquare className="w-4 h-4" /> },
     { id: 'questions', label: `Question Bank (${questions.length})`, icon: <HelpCircle className="w-4 h-4" /> },
     { id: 'cards', label: `Card Catalog & Rarity (${cards.length})`, icon: <Library className="w-4 h-4" /> },
-    { id: 'packs', label: 'Pack Availability', icon: <Package className="w-4 h-4" /> },
-    { id: 'economy', label: 'Classroom Economy & Daily Caps', icon: <Coins className="w-4 h-4" /> },
-    { id: 'classes', label: 'Classes', icon: <Users className="w-4 h-4" /> },
-    { id: 'honor', label: 'Honor Roll & Goals', icon: <Trophy className="w-4 h-4" /> },
-    { id: 'engagement', label: 'Engagement & Competition', icon: <Sliders className="w-4 h-4" /> },
-    { id: 'submissions', label: 'Student Questions', icon: <MessageSquare className="w-4 h-4" /> },
-    { id: 'units', label: `Curriculum Scope (${INITIAL_UNITS.length} Units)`, icon: <BookOpen className="w-4 h-4" /> },
-    { id: 'standards', label: 'Ohio 2026 Standards Matrix', icon: <Award className="w-4 h-4" /> }
+    { id: 'packs', label: 'Packs & Economy', icon: <Package className="w-4 h-4" /> }
   ];
 
   const currentAvatar = getAvatarById(userProfile.avatar);

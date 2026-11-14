@@ -7,9 +7,9 @@ import { Snapshot, WeeklyEntry, PeriodStat, TeacherStat } from './snapshot';
 
 // Teacher-only helpers. Everything here runs when YOU click a button, never
 // automatically, so student traffic never triggers these reads.
-interface WeekBaseline {
+export interface WeekBaseline {
   startedAt: string;
-  byUid: Record<string, { c: number; u: number; m: number }>;
+  byUid: Record<string, { c: number; u: number; m: number; q?: number }>;
 }
 
 const masterySum = (s: UserProfile): number =>
@@ -24,12 +24,39 @@ export const startNewWeek = async (students: UserProfile[]): Promise<string> => 
   students.forEach(s => {
     byUid[s.uid] = {
       c: s.totalCorrectAnswersLifetime || 0,
+      q: s.totalQuestionsAnsweredLifetime || 0,
       u: s.uniqueCardsCollected || 0,
       m: round1(masterySum(s))
     };
   });
   await setDoc(doc(db, 'adminData', 'weekBaseline'), { startedAt, byUid });
   return startedAt;
+};
+
+// This week's totals for the overview. One read of the baseline doc, cached a few
+// minutes. questions is null when the baseline predates question tracking.
+let baselineCache: { at: number; value: WeekBaseline | null } | null = null;
+export const loadWeekBaseline = async (force = false): Promise<WeekBaseline | null> => {
+  if (!isFirebaseConfigured || !db || !doc || !getDoc) return null;
+  if (!force && baselineCache && Date.now() - baselineCache.at < 5 * 60 * 1000) return baselineCache.value;
+  const snap = await getDoc(doc(db, 'adminData', 'weekBaseline'));
+  const value = snap && snap.exists() ? (snap.data() as WeekBaseline) : null;
+  baselineCache = { at: Date.now(), value };
+  return value;
+};
+
+export const weeklyTotals = (students: UserProfile[], baseline: WeekBaseline | null) => {
+  if (!baseline) return null;
+  const hasQuestions = students.some(s => baseline.byUid?.[s.uid]?.q !== undefined);
+  let correct = 0;
+  let questions = 0;
+  students.forEach(s => {
+    const b = baseline.byUid?.[s.uid];
+    if (!b) return;
+    correct += Math.max(0, (s.totalCorrectAnswersLifetime || 0) - b.c);
+    if (b.q !== undefined) questions += Math.max(0, (s.totalQuestionsAnsweredLifetime || 0) - b.q);
+  });
+  return { startedAt: baseline.startedAt, correct, questions: hasQuestions ? questions : null };
 };
 
 export const publishSnapshot = async (
