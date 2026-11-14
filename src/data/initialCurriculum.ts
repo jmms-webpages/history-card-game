@@ -166,6 +166,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   ],
   classroomTimezone: 'America/New_York', // Ohio Eastern Time
   classes: [],
+  closedPacks: [],
   focusUnitId: '',
   focusCorrectReward: 15,
   reviewCoinReward: 3,

@@ -13,7 +13,7 @@ export const SetupView: React.FC = () => {
   const { userProfile, joinClass, completeSetup, logout } = useAuth();
   const { gameSettings } = useQuestions();
   const classes = gameSettings.classes || [];
-  const needsClass = classes.length > 0 && isUnassignedClass(userProfile?.classroomCode);
+  const needsClass = isUnassignedClass(userProfile?.classroomCode);
   const needsName = !userProfile?.nameSet;
 
   const [first, setFirst] = useState('');
@@ -23,10 +23,27 @@ export const SetupView: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Step 1 is the class password; nothing else is shown until it is accepted.
+  const [step, setStep] = useState<'class' | 'profile'>(needsClass ? 'class' : 'profile');
 
   const teachers = Array.from(new Set(classes.map(c => c.teacher)));
 
-  const submit = async (e: React.FormEvent) => {
+  const submitClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await joinClass(classCode, password);
+      setPassword('');
+      setStep('profile');
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     const fullName = `${first.trim()} ${last.trim()}`.replace(/\s+/g, ' ');
@@ -36,8 +53,6 @@ export const SetupView: React.FC = () => {
     }
     setBusy(true);
     try {
-      // Join first: a wrong password is the most likely failure and should stop here.
-      if (needsClass) await joinClass(classCode, password);
       await completeSetup(needsName ? fullName : userProfile!.displayName, avatar);
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Try again.');
@@ -49,9 +64,52 @@ export const SetupView: React.FC = () => {
   const input =
     'w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500';
 
+  if (step === 'class') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <form onSubmit={submitClass} className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+          <div>
+            <h1 className="text-2xl font-black font-serif text-amber-400">Join your class</h1>
+            <p className="text-sm text-slate-400 mt-1">Enter the class password from your teacher to continue.</p>
+          </div>
+          {classes.length === 0 ? (
+            <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+              Your teacher hasn't opened classes yet. Check back soon.
+            </p>
+          ) : (
+            <>
+              <select className={input} required value={classCode} onChange={e => setClassCode(e.target.value)}>
+                <option value="">Choose your class...</option>
+                {teachers.map(t => (
+                  <optgroup key={t} label={t}>
+                    {classes.filter(c => c.teacher === t).map(c => (
+                      <option key={c.code} value={c.code}>{c.teacher} — {c.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <input className={input} required value={password} onChange={e => setPassword(e.target.value)} placeholder="Class password" autoComplete="off" />
+              {error && <p className="text-xs text-rose-300">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? 'Checking...' : 'Continue'}
+              </button>
+            </>
+          )}
+          <button type="button" onClick={logout} className="text-xs text-slate-500 hover:text-slate-300 cursor-pointer">
+            Sign out
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+      <form onSubmit={submitProfile} className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div>
           <h1 className="text-2xl font-black font-serif text-amber-400">Welcome to History Card Quest</h1>
           <p className="text-sm text-slate-400 mt-1">
@@ -93,26 +151,6 @@ export const SetupView: React.FC = () => {
               <input className={input} required value={last} onChange={e => setLast(e.target.value)} placeholder="Last name" autoComplete="off" maxLength={20} />
             </div>
             <p className="text-[11px] text-slate-500 mt-1">Use your real name. Your teacher can see it, and you can't change it later.</p>
-          </div>
-        )}
-
-        {needsClass && (
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Your class</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <select className={input} required value={classCode} onChange={e => setClassCode(e.target.value)}>
-                <option value="">Choose your class...</option>
-                {teachers.map(t => (
-                  <optgroup key={t} label={t}>
-                    {classes.filter(c => c.teacher === t).map(c => (
-                      <option key={c.code} value={c.code}>{c.teacher} — {c.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <input className={input} required value={password} onChange={e => setPassword(e.target.value)} placeholder="Class password" autoComplete="off" />
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">Your teacher gives you the password. You can only join once.</p>
           </div>
         )}
 

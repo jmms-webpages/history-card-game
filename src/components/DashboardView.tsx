@@ -8,7 +8,6 @@ import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
 import { CardDetailModal } from './CardDetailModal';
-import { isUnassignedClass, classLabel } from '../utils/classes';
 import { DashboardEngagement } from './EngagementBanners';
 import { RARITY_COLORS } from '../data/cards';
 import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
@@ -62,7 +61,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono truncate">
-                  {isUnassignedClass(userProfile.classroomCode) ? 'No class yet' : classLabel(gameSettings.classes || [], userProfile.classroomCode)} • {userProfile.role === 'admin' ? 'Teacher & Director' : '8th Grade Historian'}
+                  {userProfile.role === 'admin' ? 'Teacher & Director' : '8th Grade Historian'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100 truncate break-words">

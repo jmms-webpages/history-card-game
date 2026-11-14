@@ -3,6 +3,7 @@ import { Card, Pack, InventoryItem, CardRarity } from '../types';
 import { INITIAL_CARDS, INITIAL_PACKS } from '../data/cards';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 import { useAuth } from './AuthContext';
+import { useQuestions } from './QuestionsContext';
 import { sounds } from '../utils/audio';
 import { isFresh, markFetched } from '../utils/cache';
 import { isFirebaseConfigured, db, doc, getDoc, setDoc, collection, getDocs } from '../firebase/config';
@@ -53,11 +54,11 @@ interface CardsContextType {
 const CardsContext = createContext<CardsContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_CARDS_KEY = 'history_card_quest_cards';
-const LOCAL_STORAGE_PACKS_KEY = 'history_card_quest_pack_overrides';
 const LOCAL_STORAGE_INVENTORY_PREFIX = 'history_card_quest_inv_';
 
 export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userProfile, updateCoins, updateUserProfile } = useAuth();
+  const { gameSettings, updateGameSettings } = useQuestions();
   const inventoryRef = React.useRef<InventoryItem[]>([]);
 
   const [cards, setCards] = useState<Card[]>(() => {
@@ -106,61 +107,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   }, []);
 
-  const [packOverrides, setPackOverrides] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_PACKS_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  useEffect(() => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('packs')) return;
-    (async () => {
-      try {
-        const packsColl = collection(db, 'packs');
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-        const snap = await Promise.race([getDocs(packsColl), timeout]) as any;
-        if (snap && snap.docs) markFetched('packs');
-        if (snap && snap.docs && snap.docs.length > 0) {
-          const overrides: Record<string, boolean> = {};
-          snap.docs.forEach((d: any) => {
-            const data = d.data();
-            if (data?.packId && typeof data.active === 'boolean') {
-              overrides[data.packId] = data.active;
-            }
-          });
-          setPackOverrides(overrides);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_PACKS_KEY, JSON.stringify(overrides));
-          } catch {}
-        }
-      } catch (e) {
-        console.warn('Pack availability fetch notice (using cached packs):', e);
-      }
-    })();
-  }, []);
+  const closedPacks = gameSettings.closedPacks || [];
 
   const togglePackActive = (packId: string) => {
-    const currentPack = INITIAL_PACKS.find(p => p.packId === packId);
-    const currentlyActive = packOverrides[packId] ?? currentPack?.active ?? true;
-    const newActive = !currentlyActive;
-
-    setPackOverrides(prev => {
-      const next = { ...prev, [packId]: newActive };
-      try {
-        localStorage.setItem(LOCAL_STORAGE_PACKS_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-
-    if (isFirebaseConfigured && db && doc && setDoc) {
-      const packRef = doc(db, 'packs', packId);
-      setDoc(packRef, { packId, active: newActive }, { merge: true }).catch(e => {
-        console.warn('Pack availability sync notice:', e);
-      });
-    }
+    const nextClosed = closedPacks.includes(packId)
+      ? closedPacks.filter(id => id !== packId)
+      : [...closedPacks, packId];
+    updateGameSettings({ closedPacks: nextClosed });
   };
 
   const getPackCardPoolInternal = (pack: Pack, activeCards: Card[]): Card[] => {
@@ -181,14 +134,14 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_PACKS.map(pack => {
       const pool = getPackCardPoolInternal(pack, activeCards);
       const totalPossible = pool.length > 0 ? pool.length : activeCards.length;
-      const active = packOverrides[pack.packId] ?? pack.active;
+      const active = pack.active && !closedPacks.includes(pack.packId);
       return {
         ...pack,
         cardCount: totalPossible,
         active
       };
     });
-  }, [cards, packOverrides]);
+  }, [cards, gameSettings.closedPacks]);
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(true);

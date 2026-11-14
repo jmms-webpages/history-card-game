@@ -3,6 +3,7 @@ import { Package, Sparkles, Coins, Info, Check, Layers, Eye, X, Lock } from 'luc
 import { useCards } from '../context/CardsContext';
 import { useAuth } from '../context/AuthContext';
 import { PackOpeningModal } from './PackOpeningModal';
+import { PackCoverImage } from './PackCoverImage';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
 import { RARITY_COLORS } from '../data/cards';
 import { Pack, Card, CardRarity } from '../types';
@@ -166,7 +167,8 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                 <div
                   className={`w-full aspect-[16/10] rounded-2xl bg-gradient-to-br ${pack.coverColor} p-4 flex flex-col justify-between relative overflow-hidden shadow-inner border border-white/10 group-hover:scale-[1.02] transition-transform duration-300`}
                 >
-                  <div className="flex items-center justify-between text-white/90">
+                  <PackCoverImage packId={pack.packId} />
+                  <div className="relative flex items-center justify-between text-white/90">
                     <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/20 text-amber-300">
                       Pulls 5 Cards
                     </span>
@@ -176,7 +178,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                     </span>
                   </div>
 
-                  <div className="text-center py-2">
+                  <div className="relative text-center py-2">
                     <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto text-2xl shadow-lg group-hover:rotate-6 transition-transform">
                       📜
                     </div>
@@ -185,7 +187,7 @@ export const PacksView: React.FC<PacksViewProps> = ({ onNavigate }) => {
                     </h3>
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-white/80 font-mono">
+                  <div className="relative flex items-center justify-between text-[10px] text-white/80 font-mono">
                     <span className="truncate max-w-[150px]">{pack.theme}</span>
                     <span className="font-bold text-amber-300">1x Guaranteed Slot</span>
                   </div>
