@@ -196,7 +196,7 @@ export const ProfileView: React.FC = () => {
               <span>{userProfile.displayName}</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Set from your school Google account.
+              Ask your teacher if it needs to change.
             </p>
           </div>
 

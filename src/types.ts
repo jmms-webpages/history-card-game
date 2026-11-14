@@ -5,6 +5,8 @@ export type CardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Legendary' | 'Mythica
 export interface UserProfile {
   uid: string;
   displayName: string;
+  // True once the student typed their real name in first-time setup; locked until a teacher resets it.
+  nameSet?: boolean;
   avatar: string;
   classroomCode: string;
   role: UserRole;
