@@ -4,6 +4,7 @@ import { useQuestions } from '../context/QuestionsContext';
 import { HISTORICAL_AVATARS } from '../data/avatars';
 import { isUnassignedClass } from '../utils/classes';
 import { BadgeCheck } from 'lucide-react';
+import { AvatarFace } from './AvatarFace';
 
 const NAME_OK = /^[A-Za-z][A-Za-z'.\-]*(\s+[A-Za-z][A-Za-z'.\-]*)+$/;
 
@@ -72,7 +73,7 @@ export const SetupView: React.FC = () => {
                     selected ? 'border-amber-400 bg-amber-500/15 ring-1 ring-amber-400/40' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-lg ${a.color} flex items-center justify-center text-lg shrink-0`}>{a.badge}</div>
+                  <div className={`w-9 h-9 rounded-lg ${a.color} overflow-hidden flex items-center justify-center text-lg shrink-0`}><AvatarFace avatar={a} /></div>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold text-slate-100 truncate">{a.name}</div>
                     <div className="text-[10px] text-slate-400 truncate">{a.title}</div>

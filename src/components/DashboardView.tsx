@@ -12,6 +12,7 @@ import { isUnassignedClass, classLabel } from '../utils/classes';
 import { DashboardEngagement } from './EngagementBanners';
 import { RARITY_COLORS } from '../data/cards';
 import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
+import { AvatarFace } from './AvatarFace';
 
 interface DashboardViewProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -55,8 +56,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4 min-w-0 flex-1">
-            <div className={`w-16 h-16 rounded-2xl ${currentAvatar.color} flex items-center justify-center text-3xl shadow-lg border border-amber-400/30 shrink-0`}>
-              {currentAvatar.badge}
+            <div className={`w-16 h-16 rounded-2xl ${currentAvatar.color} overflow-hidden flex items-center justify-center text-3xl shadow-lg border border-amber-400/30 shrink-0`}>
+              <AvatarFace avatar={currentAvatar} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

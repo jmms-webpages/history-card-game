@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { NavigationTab } from '../types';
 import { getAvatarById } from '../data/avatars';
 import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil } from 'lucide-react';
+import { AvatarFace } from './AvatarFace';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -201,8 +202,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           onClick={() => handleTabClick('profile')}
           className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 transition-colors cursor-pointer group"
         >
-          <div className={`w-8 h-8 rounded-full ${currentAvatar.color} flex items-center justify-center text-xs font-bold text-white shadow shrink-0`}>
-            {currentAvatar.badge}
+          <div className={`w-8 h-8 rounded-full ${currentAvatar.color} overflow-hidden flex items-center justify-center text-xs font-bold text-white shadow shrink-0`}>
+            <AvatarFace avatar={currentAvatar} />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-200 truncate group-hover:text-amber-300 transition-colors">
@@ -266,9 +267,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           <button
             type="button"
             onClick={() => handleTabClick('profile')}
-            className={`w-7 h-7 rounded-full ${currentAvatar.color} flex items-center justify-center text-xs font-bold text-white shadow`}
+            className={`w-7 h-7 rounded-full ${currentAvatar.color} overflow-hidden flex items-center justify-center text-xs font-bold text-white shadow`}
           >
-            {currentAvatar.badge}
+            <AvatarFace avatar={currentAvatar} />
           </button>
         </div>
       </header>
