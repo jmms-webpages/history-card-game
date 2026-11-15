@@ -40,6 +40,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     toggleCardActive,
     updateCard,
     addCustomCard,
+    deleteCustomCard,
     togglePackActive
   } = useCards();
 
@@ -1049,6 +1050,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                     <Pencil className="w-3.5 h-3.5" />
                     <span>Edit</span>
                   </button>
+                  {card.cardId.startsWith('card-custom-') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!window.confirm(`Delete "${card.name}"? Students who already own it will lose it from their binders.`)) return;
+                        if (!window.confirm(`Are you sure? Deleting "${card.name}" cannot be undone.`)) return;
+                        deleteCustomCard(card.cardId);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border bg-rose-950 border-rose-800 text-rose-300 hover:bg-rose-900"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => toggleCardActive(card.cardId)}

@@ -53,6 +53,7 @@ interface CardsContextType {
   addCustomCard: (card: Omit<Card, 'cardId'>) => void;
   toggleCardActive: (cardId: string) => void;
   updateCard: (cardId: string, patch: CardEdit) => void;
+  deleteCustomCard: (cardId: string) => void;
   togglePackActive: (packId: string) => void;
 }
 
@@ -108,7 +109,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (data?.cardId) overrides.set(data.cardId, data);
           });
           setCards(prev => {
-            const updated = prev.map(c => {
+            const updated = prev.filter(c => !overrides.get(c.cardId)?.deleted).map(c => {
               const o = overrides.get(c.cardId);
               if (!o) return c;
               const next: any = { ...c };
@@ -607,6 +608,25 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updateGameSettings({ catalogVersion: Date.now() });
   };
 
+  // Only teacher-created cards can be deleted (built-in cards would just come back; Vault them instead).
+  // A "deleted" marker is saved so other devices drop the card too.
+  const deleteCustomCard = (cardId: string) => {
+    if (!cardId.startsWith('card-custom-')) return;
+    const updated = cards.filter(c => c.cardId !== cardId);
+    setCards(updated);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      setDoc(doc(db, 'cards', cardId), { cardId, custom: true, deleted: true }).catch(e => {
+        console.warn('Card delete sync notice:', e);
+      });
+    }
+    updateGameSettings({ catalogVersion: Date.now() });
+  };
+
   const updateCard = (cardId: string, patch: CardEdit) => {
     const clean: CardEdit = {};
     EDITABLE_CARD_FIELDS.forEach(f => {
@@ -674,6 +694,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       addCustomCard,
       toggleCardActive,
       updateCard,
+      deleteCustomCard,
       togglePackActive
     }}>
       {children}
