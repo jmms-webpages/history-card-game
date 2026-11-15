@@ -77,11 +77,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     );
   };
 
-  // The three weakest units, each with a one-click practice button.
-  const weakest = INITIAL_UNITS.map((unit, i) => {
+  // Every unit's mastery in one place, each with a one-click practice button.
+  const masteryRows = INITIAL_UNITS.map((unit, i) => {
     const points = userProfile.unitMastery?.[unit.unitId] || 0;
     return { unit, num: i + 1, percent: Math.min(100, Math.round((points / MASTERY_TARGET_POINTS) * 100)) };
-  }).sort((a, b) => a.percent - b.percent).slice(0, 3);
+  });
+  const lowestPercent = Math.min(...masteryRows.map(r => r.percent));
   const practiceUnit = (unitId: string) => {
     setPracticeUnitIds([unitId]);
     onNavigate('practice');
@@ -152,30 +153,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <DashboardGoal />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DashboardReminders onNavigate={onNavigate} />
-        <div className={cardCls}>
-          <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><TrendingDown className="w-4 h-4 text-amber-400" /> Lowest Mastery</h3>
-          <div className="space-y-3">
-            {weakest.map(({ unit, num, percent }) => (
-              <div key={unit.unitId} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-bold text-slate-200 truncate">Unit {num}: {unit.unitName}</span>
-                    <span className="font-mono font-bold text-amber-400 ml-2">{percent}%</span>
-                  </div>
-                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                    <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400" style={{ width: `${percent}%` }} />
-                  </div>
-                </div>
-                <button type="button" onClick={() => practiceUnit(unit.unitId)} className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold cursor-pointer whitespace-nowrap">
-                  Practice
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <DashboardReminders onNavigate={onNavigate} />
 
       {/* Collection Binder Progress Summary Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -228,6 +206,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <span>{stats.completionPercentage}% of the set collected</span>
             <span>{stats.duplicatesCount} Duplicates Available to Sell</span>
           </div>
+        </div>
+      </div>
+
+      {/* Unit Mastery: every unit at a glance, with one-click practice */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div>
+          <h3 className="font-serif font-black text-slate-100 text-lg flex items-center gap-2">
+            <TrendingDown className="w-5 h-5 text-amber-400" /> Unit Mastery
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Correct answers build mastery in a unit; a miss only costs half as much. Tap Practice to work on a unit.
+          </p>
+        </div>
+        <div className="space-y-3">
+          {masteryRows.map(({ unit, num, percent }) => (
+            <div key={unit.unitId} className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-bold text-slate-200 truncate">
+                    Unit {num}: {unit.unitName}
+                    {percent === lowestPercent && percent < 100 && (
+                      <span className="ml-2 text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">lowest</span>
+                    )}
+                  </span>
+                  <span className={`font-mono font-bold ml-2 ${percent >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>{percent >= 100 ? 'Mastered!' : `${percent}%`}</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${percent >= 100 ? 'bg-emerald-400' : 'bg-gradient-to-r from-amber-500 to-amber-400'}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </div>
+              <button type="button" onClick={() => practiceUnit(unit.unitId)} className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold cursor-pointer whitespace-nowrap">
+                Practice
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
