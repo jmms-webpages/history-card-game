@@ -19,6 +19,7 @@ interface Props {
   students: UserProfile[];
   loading: boolean;
   onRefresh: () => void;
+  onFullReload: () => void;
   promotingUid: string | null;
   onRename: (s: UserProfile) => void;
   onRemove: (s: UserProfile) => void;
@@ -28,7 +29,7 @@ interface Props {
 
 type MasteryView = 'school' | 'teacher' | 'class';
 
-export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefresh, promotingUid, onRename, onRemove, onPromote, onStudentMoved }) => {
+export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefresh, onFullReload, promotingUid, onRename, onRemove, onPromote, onStudentMoved }) => {
   const { gameSettings, updateGameSettings } = useQuestions();
   const classes: ClassInfo[] = gameSettings.classes || [];
 
@@ -232,6 +233,14 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefres
           <button type="button" onClick={onRefresh} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh Roster</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { if (window.confirm(`Re-read every student profile (about ${students.length || 500} reads)? Only needed to catch removed students.`)) onFullReload(); }}
+            disabled={loading}
+            className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer"
+          >
+            Full reload
           </button>
         </div>
       </div>

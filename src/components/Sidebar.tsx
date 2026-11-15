@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavigationTab, AdminSubTab } from '../types';
 import { useQuestions } from '../context/QuestionsContext';
-import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { getAvatarById } from '../data/avatars';
-import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil, LayoutDashboard, BookOpen, Sliders, Award, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Compass, HelpCircle, Package, Library, User, LogOut, Coins, Menu, X, ShieldCheck, Eye, Trophy, Settings, ChevronRight, Users, Pencil, LayoutDashboard, BookOpen, Sliders, Award, MessageSquare, ArrowLeft, Wrench } from 'lucide-react';
 import { AvatarFace } from './AvatarFace';
 
 interface SidebarProps {
@@ -25,8 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, admin
     setStudentViewMode, 
     toggleStudentViewMode 
   } = useAuth();
-  const { questions } = useQuestions();
-  const { cards } = useCards();
+  const { questions, gameSettings, updateGameSettings } = useQuestions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!userProfile) return null;
@@ -39,8 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, admin
     { id: 'honor', label: 'Honor Roll & Goals', icon: <Trophy className="w-4 h-4" /> },
     { id: 'submissions', label: 'Student Questions', icon: <MessageSquare className="w-4 h-4" /> },
     { id: 'questions', label: `Question Bank (${questions.length})`, icon: <HelpCircle className="w-4 h-4" /> },
-    { id: 'cards', label: `Card Catalog & Rarity (${cards.length})`, icon: <Library className="w-4 h-4" /> },
-    { id: 'packs', label: 'Packs & Economy', icon: <Package className="w-4 h-4" /> }
+    { id: 'packs', label: 'Economy & Packs', icon: <Package className="w-4 h-4" /> }
   ];
 
   const currentAvatar = getAvatarById(userProfile.avatar);
@@ -129,6 +126,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, admin
                 <Eye className="w-4 h-4 text-emerald-400" />
                 <span>Student View</span>
               </div>
+            </button>
+            <button
+              id="sidebar-toggle-maintenance"
+              type="button"
+              onClick={() => {
+                const on = !gameSettings.maintenanceMode;
+                if (on && !window.confirm('Turn on maintenance mode? Students will see an "Under Maintenance" screen within about 4 minutes.')) return;
+                updateGameSettings({ maintenanceMode: on });
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer mt-2 ${
+                gameSettings.maintenanceMode
+                  ? 'bg-rose-500/20 border-rose-500/50 text-rose-200 hover:bg-rose-500/30'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-amber-400" />
+                <span>Maintenance Mode</span>
+              </div>
+              <span className="font-mono text-[10px] font-bold">{gameSettings.maintenanceMode ? 'ON' : 'OFF'}</span>
             </button>
           </div>
         ) : (

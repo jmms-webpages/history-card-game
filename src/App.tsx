@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { QuestionsProvider } from './context/QuestionsContext';
+import { QuestionsProvider, useQuestions } from './context/QuestionsContext';
+import { MaintenanceView } from './components/MaintenanceView';
 import { CardsProvider } from './context/CardsContext';
 import { NavigationTab, AdminSubTab } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -29,6 +30,7 @@ const MainAppContent: React.FC = () => {
   const [adminTab, setAdminTab] = useState<AdminSubTab>('overview');
   const [studentCount, setStudentCount] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
+  const { gameSettings } = useQuestions();
 
   React.useEffect(() => {
     const timer = setTimeout(() => setTimedOut(true), 600);
@@ -53,6 +55,11 @@ const MainAppContent: React.FC = () => {
 
   if (!userProfile) {
     return <AuthView />;
+  }
+
+  // Teachers can switch the game off for students while they push updates.
+  if (!isAdmin && gameSettings.maintenanceMode) {
+    return <MaintenanceView />;
   }
 
   // Students finish setup (avatar, real name, class) before seeing the dashboard.

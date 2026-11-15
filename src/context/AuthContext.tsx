@@ -295,7 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isFirebaseConfigured && db && doc && remoteConfirmed) {
       const userRef = doc(db, 'users', uid);
-      setDoc(userRef, combinedProfile, { merge: true }).catch(e => {
+      setDoc(userRef, { ...combinedProfile, updatedAt: Date.now() }, { merge: true }).catch(e => {
         console.warn('Async firestore write notice:', e);
       });
     }
@@ -420,7 +420,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isFirebaseConfigured && db && doc) {
       const userRef = doc(db, 'users', updated.uid);
-      updateDoc(userRef, updates).catch(e => {
+      updateDoc(userRef, { ...updates, updatedAt: Date.now() }).catch(e => {
         console.warn('Firestore profile update notice:', e);
       });
     }
@@ -435,7 +435,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const name = displayName.trim().replace(/\s+/g, ' ');
     if (isFirebaseConfigured && db && doc) {
       try {
-        await updateDoc(doc(db, 'users', base.uid), { displayName: name, nameSet: true, avatar });
+        await updateDoc(doc(db, 'users', base.uid), { displayName: name, nameSet: true, avatar, updatedAt: Date.now() });
       } catch (e: any) {
         if (e?.code === 'permission-denied') {
           throw new Error('Could not save your name. Ask your teacher.');
@@ -456,7 +456,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const proof = await hashClassPassword(code, password);
     if (isFirebaseConfigured && db && doc) {
       try {
-        await updateDoc(doc(db, 'users', base.uid), { classroomCode: code, joinProof: proof });
+        await updateDoc(doc(db, 'users', base.uid), { classroomCode: code, joinProof: proof, updatedAt: Date.now() });
       } catch (e: any) {
         if (e?.code === 'permission-denied') {
           throw new Error("That password isn't right for this class, or you've already joined one. Ask your teacher.");
@@ -464,7 +464,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Could not join right now. Please try again.');
       }
     }
-    applyProfileUpdate({ classroomCode: code, joinProof: proof });
+    applyProfileUpdate({ classroomCode: code, joinProof: proof, updatedAt: Date.now() });
   };
 
   // Bundles a coin change and a unit-mastery change into ONE Firestore
@@ -498,7 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isFirebaseConfigured && db && doc) {
       const userRef = doc(db, 'users', updated.uid);
-      updateDoc(userRef, updates).catch(e => {
+      updateDoc(userRef, { ...updates, updatedAt: Date.now() }).catch(e => {
         console.warn('Firestore question-outcome sync notice:', e);
       });
     }
@@ -516,7 +516,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // network write. Local state is already updated above.
   if (isFirebaseConfigured && db && doc) {
     const userRef = doc(db, 'users', updated.uid);
-    updateDoc(userRef, { coins: newCoins }).catch(e => {
+    updateDoc(userRef, { coins: newCoins, updatedAt: Date.now() }).catch(e => {
       console.warn('Firestore coins update notice:', e);
     });
   }

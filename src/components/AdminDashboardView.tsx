@@ -50,6 +50,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   // only re-fetched when you click "Refresh Roster" (or on the very first
   // visit, when there's nothing cached yet).
   const ROSTER_CACHE_KEY = 'hcq_admin_roster';
+  const ROSTER_SYNC_KEY = 'hcq_admin_roster_sync';
   const [students, setStudents] = useState<UserProfile[]>(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || 'null');
@@ -60,18 +61,41 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   });
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
 
-  const fetchStudents = async (): Promise<UserProfile[] | undefined> => {
+  // Loading ~500 profiles costs ~500 reads, so after the first full load a
+  // refresh only reads profiles changed since the last sync (usually far fewer).
+  // fullReload=true re-reads everyone (also picks up removed students).
+  const fetchStudents = async (fullReload = false): Promise<UserProfile[] | undefined> => {
     if (!isFirebaseConfigured || !db || !collection || !getDocs || !query || !where) return;
     setLoadingStudents(true);
     try {
       const usersColl = collection(db, 'users');
-      const studentQuery = query(usersColl, where('role', '==', 'student'));
-      const snap = await getDocs(studentQuery);
-      const list: UserProfile[] = snap.docs.map((d: any) => d.data() as UserProfile);
+      let lastSync = 0;
+      try {
+        lastSync = Number(localStorage.getItem(ROSTER_SYNC_KEY) || 0);
+      } catch {
+        // ignore
+      }
+      const syncStartedAt = Date.now();
+      const incremental = !fullReload && lastSync > 0 && students.length > 0 && syncStartedAt - lastSync < 24 * 3600 * 1000;
+      let list: UserProfile[];
+      if (incremental) {
+        // 2-minute overlap so writes landing during the last sync aren't missed.
+        const snap = await getDocs(query(usersColl, where('updatedAt', '>', lastSync - 120000)));
+        const byUid = new Map(students.map(s => [s.uid, s] as [string, UserProfile]));
+        snap.docs.forEach((d: any) => {
+          const data = d.data() as UserProfile;
+          if (data.role === 'student') byUid.set(data.uid, data);
+        });
+        list = Array.from(byUid.values());
+      } else {
+        const snap = await getDocs(query(usersColl, where('role', '==', 'student')));
+        list = snap.docs.map((d: any) => d.data() as UserProfile);
+      }
       list.sort((a, b) => a.displayName.localeCompare(b.displayName));
       setStudents(list);
       try {
         localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(list));
+        localStorage.setItem(ROSTER_SYNC_KEY, String(syncStartedAt));
       } catch {
         // ignore
       }
@@ -107,7 +131,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     const name = (input || '').trim().replace(/\s+/g, ' ');
     if (!name || name === student.displayName) return;
     try {
-      await updateDoc(doc(db, 'users', student.uid), { displayName: name, nameSet: true });
+      await updateDoc(doc(db, 'users', student.uid), { displayName: name, nameSet: true, updatedAt: Date.now() });
       patchRoster(student.uid, { displayName: name, nameSet: true });
     } catch (e) {
       console.warn('Rename notice:', e);
@@ -138,7 +162,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     setPromotingUid(student.uid);
     try {
       const userRef = doc(db, 'users', student.uid);
-      await updateDoc(userRef, { role: 'admin' });
+      await updateDoc(userRef, { role: 'admin', updatedAt: Date.now() });
       // Update the local roster instead of re-reading every student.
       setStudents(prev => {
         const next = prev.filter(s => s.uid !== student.uid);
@@ -216,7 +240,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'trivia' | 'ost'>('all');
 
   // Card catalog filters
-  const [filterCardUnit, setFilterCardUnit] = useState<string>('all');
+  const [filterCardUnit, setFilterCardUnit] = useState<string>('');
   const [filterCardRarity, setFilterCardRarity] = useState<string>('all');
   const [cardSearch, setCardSearch] = useState<string>('');
 
@@ -404,7 +428,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <AdminClassesPanel
           students={students}
           loading={loadingStudents}
-          onRefresh={fetchStudents}
+          onRefresh={() => fetchStudents()}
+          onFullReload={() => fetchStudents(true)}
           promotingUid={promotingUid}
           onRename={renameStudent}
           onRemove={removeStudent}
@@ -581,203 +606,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         </div>
       )}
 
-      {/* 3. Card Catalog Tab */}
-      {activeSubTab === 'cards' && (
-        <div className="space-y-6 animate-fadeIn">
-          {/* Rarity & Distribution Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Cards</span>
-              <span className="text-xl font-bold font-mono text-slate-100 mt-0.5 block">{cards.length}</span>
-              <span className="text-[10px] text-emerald-400">{cards.filter(c => c.active).length} Active</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-slate-400 block">Common (65%)</span>
-              <span className="text-xl font-bold font-mono text-slate-300 mt-0.5 block">
-                {cards.filter(c => c.rarity === 'Common').length}
-              </span>
-              <span className="text-[10px] text-slate-500">Base tier</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-emerald-400 block">Uncommon (22%)</span>
-              <span className="text-xl font-bold font-mono text-emerald-300 mt-0.5 block">
-                {cards.filter(c => c.rarity === 'Uncommon').length}
-              </span>
-              <span className="text-[10px] text-slate-500">Core concepts</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-blue-400 block">Rare (9%)</span>
-              <span className="text-xl font-bold font-mono text-blue-300 mt-0.5 block">
-                {cards.filter(c => c.rarity === 'Rare').length}
-              </span>
-              <span className="text-[10px] text-slate-500">Key artifacts</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-amber-400 block">Legendary (3.5%)</span>
-              <span className="text-xl font-bold font-mono text-amber-300 mt-0.5 block">
-                {cards.filter(c => c.rarity === 'Legendary').length}
-              </span>
-              <span className="text-[10px] text-slate-500">Major leaders</span>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
-              <span className="text-[10px] uppercase font-mono text-purple-400 block">Mythical (0.5%)</span>
-              <span className="text-xl font-bold font-mono text-purple-300 mt-0.5 block">
-                {cards.filter(c => c.rarity === 'Mythical').length}
-              </span>
-              <span className="text-[10px] text-slate-500">Foundational</span>
-            </div>
-          </div>
-
-          {/* Filter Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-xs text-slate-400 font-mono">Unit:</span>
-                <select
-                  value={filterCardUnit}
-                  onChange={(e) => setFilterCardUnit(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
-                >
-                  <option value="all">All Units ({cards.length})</option>
-                  {INITIAL_UNITS.map(u => (
-                    <option key={u.unitId} value={u.unitId}>
-                      {u.order}. {u.unitName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-mono">Rarity:</span>
-                <select
-                  value={filterCardRarity}
-                  onChange={(e) => setFilterCardRarity(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
-                >
-                  <option value="all">All Rarities</option>
-                  <option value="Common">Common</option>
-                  <option value="Uncommon">Uncommon</option>
-                  <option value="Rare">Rare</option>
-                  <option value="Legendary">Legendary</option>
-                  <option value="Mythical">Mythical</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 flex-1 max-w-xs">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={cardSearch}
-                  onChange={(e) => setCardSearch(e.target.value)}
-                  placeholder="Search cards..."
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 font-mono shrink-0">
-              Showing {filteredCards.length} cards
-            </p>
-          </div>
-
-          {/* Cards List */}
-          <div className="space-y-3">
-            {filteredCards.map(card => (
-              <div
-                key={card.cardId}
-                className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
-                  card.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-60'
-                }`}
-              >
-                <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                  <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl shrink-0">
-                    {card.symbol || '📜'}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        card.rarity === 'Mythical' ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' :
-                        card.rarity === 'Legendary' ? 'bg-amber-500/20 text-amber-300 border-amber-400/40' :
-                        card.rarity === 'Rare' ? 'bg-blue-500/20 text-blue-300 border-blue-400/40' :
-                        card.rarity === 'Uncommon' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40' :
-                        'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}>
-                        {card.rarity}
-                      </span>
-                      <span className="text-[10px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                        {card.standardId}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        {card.packTheme}
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-100 font-serif">
-                      {card.name}
-                    </h4>
-                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                      {card.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => toggleCardActive(card.cardId)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                      card.active
-                        ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {card.active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
-                    <span>{card.active ? 'Active in Packs' : 'Vaulted'}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pack Availability Tab */}
-      {activeSubTab === 'packs' && (
-        <div className="space-y-3 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow">
-            <h3 className="font-bold text-slate-100 text-base">Curriculum Pack Availability</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Lock a unit's booster pack until your class actually reaches that unit. Locked packs can't be opened by students, even if they have the coins.
-            </p>
-          </div>
-          {packs.map(pack => (
-            <div
-              key={pack.packId}
-              className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
-                pack.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-70'
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-bold text-slate-100 font-serif">{pack.name}</h4>
-                <p className="text-xs text-slate-400 mt-0.5">{pack.theme} &middot; {pack.cardCount} possible cards</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => togglePackActive(pack.packId)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border shrink-0 ${
-                  pack.active
-                    ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {pack.active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
-                <span>{pack.active ? 'Open to Students' : 'Locked'}</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* 4. Classroom Economy Tab */}
       {activeSubTab === 'packs' && (
         <form onSubmit={handleSaveEconomy} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 animate-fadeIn">
@@ -867,6 +695,212 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <span>Apply Economy Settings</span>
           </button>
         </form>
+      )}
+
+      {/* Pack Availability Tab */}
+      {activeSubTab === 'packs' && (
+        <div className="space-y-3 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow">
+            <h3 className="font-bold text-slate-100 text-base">Curriculum Pack Availability</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Lock a unit's booster pack until your class actually reaches that unit. Locked packs can't be opened by students, even if they have the coins.
+            </p>
+          </div>
+          {packs.map(pack => (
+            <div
+              key={pack.packId}
+              className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+                pack.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-70'
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-bold text-slate-100 font-serif">{pack.name}</h4>
+                <p className="text-xs text-slate-400 mt-0.5">{pack.theme} &middot; {pack.cardCount} possible cards</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => togglePackActive(pack.packId)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border shrink-0 ${
+                  pack.active
+                    ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {pack.active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
+                <span>{pack.active ? 'Open to Students' : 'Locked'}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Card Catalog (inside Economy & Packs) */}
+      {activeSubTab === 'packs' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div>
+            <h3 className="font-bold text-slate-100 text-base">Card Catalog</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Pick a unit (or All) to view its cards.</p>
+          </div>
+          {/* Filter Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-400 font-mono">Unit:</span>
+                <select
+                  value={filterCardUnit}
+                  onChange={(e) => setFilterCardUnit(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="">Choose a unit…</option>
+                  <option value="all">All Units ({cards.length})</option>
+                  {INITIAL_UNITS.map(u => (
+                    <option key={u.unitId} value={u.unitId}>
+                      {u.order}. {u.unitName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono">Rarity:</span>
+                <select
+                  value={filterCardRarity}
+                  onChange={(e) => setFilterCardRarity(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="all">All Rarities</option>
+                  <option value="Common">Common</option>
+                  <option value="Uncommon">Uncommon</option>
+                  <option value="Rare">Rare</option>
+                  <option value="Legendary">Legendary</option>
+                  <option value="Mythical">Mythical</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 max-w-xs">
+                <Search className="w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={cardSearch}
+                  onChange={(e) => setCardSearch(e.target.value)}
+                  placeholder="Search cards..."
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 font-mono shrink-0">
+              Showing {filteredCards.length} cards
+            </p>
+          </div>
+
+          {filterCardUnit !== '' && (
+          <>
+          {/* Rarity & Distribution Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Cards</span>
+              <span className="text-xl font-bold font-mono text-slate-100 mt-0.5 block">{cards.length}</span>
+              <span className="text-[10px] text-emerald-400">{cards.filter(c => c.active).length} Active</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-slate-400 block">Common (65%)</span>
+              <span className="text-xl font-bold font-mono text-slate-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Common').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Base tier</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-emerald-400 block">Uncommon (22%)</span>
+              <span className="text-xl font-bold font-mono text-emerald-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Uncommon').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Core concepts</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-blue-400 block">Rare (9%)</span>
+              <span className="text-xl font-bold font-mono text-blue-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Rare').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Key artifacts</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-amber-400 block">Legendary (3.5%)</span>
+              <span className="text-xl font-bold font-mono text-amber-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Legendary').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Major leaders</span>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow">
+              <span className="text-[10px] uppercase font-mono text-purple-400 block">Mythical (0.5%)</span>
+              <span className="text-xl font-bold font-mono text-purple-300 mt-0.5 block">
+                {cards.filter(c => c.rarity === 'Mythical').length}
+              </span>
+              <span className="text-[10px] text-slate-500">Foundational</span>
+            </div>
+          </div>
+
+          {/* Cards List */}
+          <div className="space-y-3">
+            {filteredCards.map(card => (
+              <div
+                key={card.cardId}
+                className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+                  card.active ? 'border-slate-800 hover:border-slate-700' : 'border-rose-900/40 opacity-60'
+                }`}
+              >
+                <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                  <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl shrink-0">
+                    {card.symbol || '📜'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        card.rarity === 'Mythical' ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' :
+                        card.rarity === 'Legendary' ? 'bg-amber-500/20 text-amber-300 border-amber-400/40' :
+                        card.rarity === 'Rare' ? 'bg-blue-500/20 text-blue-300 border-blue-400/40' :
+                        card.rarity === 'Uncommon' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40' :
+                        'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}>
+                        {card.rarity}
+                      </span>
+                      <span className="text-[10px] font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        {card.standardId}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {card.packTheme}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-100 font-serif">
+                      {card.name}
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                      {card.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => toggleCardActive(card.cardId)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                      card.active
+                        ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {card.active ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
+                    <span>{card.active ? 'Active in Packs' : 'Vaulted'}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
+          )}
+        </div>
       )}
 
       {/* Add Custom Question Modal */}
