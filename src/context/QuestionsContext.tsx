@@ -394,9 +394,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Regular daily trivia pool excludes OST questions -- those live in their
   // own separate one-a-day flow.
+  const disabledUnitIds = gameSettings.disabledUnitIds || [];
+  const disabledKey = disabledUnitIds.join(',');
   const activeQuestions = useMemo(() => {
-    return questions.filter(q => q.active && !q.isOST);
-  }, [questions]);
+    return questions.filter(q => q.active && !q.isOST && !disabledUnitIds.includes(q.unitId));
+  }, [questions, disabledKey]);
 
   const dailyShuffledQuestions = useMemo(() => {
     const seed = hashSeed(`${userProfile?.uid || 'guest'}_${todayKey}`);
@@ -416,8 +418,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const reviewQuestions = useMemo(() => {
     return reviewQueueIds
       .map(id => questions.find(q => q.questionId === id))
-      .filter((q): q is Question => !!q && q.active);
-  }, [reviewQueueIds, questions]);
+      .filter((q): q is Question => !!q && q.active && !disabledUnitIds.includes(q.unitId));
+  }, [reviewQueueIds, questions, disabledKey]);
 
   const currentQuestion = useMemo(() => {
     if (hasAnsweredCurrent && pinnedQuestion) return pinnedQuestion;
@@ -431,9 +433,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return practiceQuestions[practiceIndex % practiceQuestions.length];
     }
     if (dailyShuffledQuestions.length === 0) return null;
-    const index = currentQuestionIndex % dailyShuffledQuestions.length;
+    // Walk the student's shuffled list by how many daily questions they've already
+    // answered today. That count comes from their profile, so reloading, switching
+    // device or clearing the browser never replays questions they already answered.
+    const index = dailyActivity.questionsAnswered % dailyShuffledQuestions.length;
     return dailyShuffledQuestions[index] || dailyShuffledQuestions[0];
-  }, [isReviewMode, reviewQuestions, reviewIndex, dailyShuffledQuestions, currentQuestionIndex, hasAnsweredCurrent, pinnedQuestion, practiceMode, practiceQuestions, practiceIndex]);
+  }, [isReviewMode, reviewQuestions, reviewIndex, dailyShuffledQuestions, dailyActivity.questionsAnswered, hasAnsweredCurrent, pinnedQuestion, practiceMode, practiceQuestions, practiceIndex]);
 
   const isDailyLimitReached = useMemo(() => {
     return dailyActivity.questionsAnswered >= gameSettings.dailyQuestionLimit;

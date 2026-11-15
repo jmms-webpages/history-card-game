@@ -167,6 +167,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   classroomTimezone: 'America/New_York', // Ohio Eastern Time
   classes: [],
   closedPacks: [],
+  disabledUnitIds: [],
   maintenanceMode: false,
   catalogVersion: 0,
   upcomingTests: [],

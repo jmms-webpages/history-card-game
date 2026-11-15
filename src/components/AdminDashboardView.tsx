@@ -462,6 +462,46 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       {/* 2. Question Bank Tab */}
       {activeSubTab === 'questions' && (
         <div className="space-y-4 animate-fadeIn">
+          {/* Unit switches: turn a whole unit's questions on or off for students */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-slate-100 text-sm">Units in Play</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Switch a unit off to hide all of its questions from students (daily, practice and review). Individual question settings are kept.</p>
+              </div>
+              {(gameSettings.disabledUnitIds || []).length > 0 && (
+                <button type="button" onClick={() => updateGameSettings({ disabledUnitIds: [] })} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 cursor-pointer">
+                  Turn all units on
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {INITIAL_UNITS.map((u, i) => {
+                const off = (gameSettings.disabledUnitIds || []).includes(u.unitId);
+                const count = questions.filter(q => q.unitId === u.unitId && q.active && !q.isOST).length;
+                return (
+                  <button
+                    key={u.unitId}
+                    type="button"
+                    onClick={() => {
+                      const cur = gameSettings.disabledUnitIds || [];
+                      updateGameSettings({ disabledUnitIds: off ? cur.filter(id => id !== u.unitId) : [...cur, u.unitId] });
+                    }}
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs text-left cursor-pointer transition-colors ${
+                      off ? 'bg-slate-950 border-rose-900/50 text-slate-500' : 'bg-emerald-950/40 border-emerald-800/60 text-slate-100 hover:bg-emerald-950/70'
+                    }`}
+                  >
+                    <span className="truncate"><strong>Unit {i + 1}:</strong> {u.unitName} <span className="text-slate-500">({count} active)</span></span>
+                    <span className={`flex items-center gap-1 font-bold shrink-0 ${off ? 'text-rose-300' : 'text-emerald-300'}`}>
+                      {off ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+                      {off ? 'Off' : 'On'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 flex-1">
               <div className="flex items-center gap-2">
