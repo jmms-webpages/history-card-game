@@ -491,6 +491,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updates.todayDate = dayKey;
       updates.todayQuestions = (sameDay ? base.todayQuestions || 0 : 0) + 1;
       updates.todayCorrect = (sameDay ? base.todayCorrect || 0 : 0) + (isCorrect ? 1 : 0);
+      // Calendar-week counters (Mon-Sun) for the student's own dashboard; ride on this same write.
+      const nowD = new Date();
+      const mon = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - ((nowD.getDay() + 6) % 7));
+      const weekKey = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+      const sameWeek = base.weekDate === weekKey;
+      updates.weekDate = weekKey;
+      updates.weekQuestions = (sameWeek ? base.weekQuestions || 0 : 0) + 1;
+      updates.weekCorrect = (sameWeek ? base.weekCorrect || 0 : 0) + (isCorrect ? 1 : 0);
     }
 
     const updated = applyProfileUpdate(updates);

@@ -26,6 +26,9 @@ export interface UserProfile {
   todayDate?: string;
   todayQuestions?: number;
   todayCorrect?: number;
+  weekDate?: string; // Monday (YYYY-MM-DD) of the week the counters below belong to
+  weekQuestions?: number;
+  weekCorrect?: number;
   // Engagement features -- all stored on the user doc so they ride along with
   // writes that already happen (no extra reads).
   claimedGoalIds?: string[];
