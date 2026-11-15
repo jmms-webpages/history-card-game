@@ -312,6 +312,20 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
   }, [activityStorageKey, todayKey]);
 
+  // The profile (already loaded at login) is the source of truth for today's count,
+  // so clearing browser storage or switching devices can't reset the daily limit.
+  useEffect(() => {
+    if (!userProfile || userProfile.todayDate !== todayKey) return;
+    const serverQ = userProfile.todayQuestions || 0;
+    const serverC = userProfile.todayCorrect || 0;
+    setDailyActivity(prev => {
+      if (serverQ <= prev.questionsAnswered) return prev;
+      const next = { ...prev, questionsAnswered: serverQ, correctAnswers: Math.max(prev.correctAnswers, serverC) };
+      try { localStorage.setItem(activityStorageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [userProfile?.todayDate, userProfile?.todayQuestions, userProfile?.todayCorrect, todayKey, activityStorageKey]);
+
   const answeredIdsKey = `ohio_answered_qids_${userProfile?.uid || 'guest'}_${todayKey}`;
   const [answeredQuestionIds, setAnsweredQuestionIds] = useState<string[]>(() => {
     try {
@@ -506,7 +520,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setStreak(0);
     }
 
-    if (coinsAwarded !== 0 || masteryDelta !== 0) {
+    // Daily answers always get recorded (even with no coins/mastery change) so the profile count stays accurate.
+    if (coinsAwarded !== 0 || masteryDelta !== 0 || !isReviewMode) {
       recordQuestionOutcome({
         coinsDelta: coinsAwarded,
         unitId,

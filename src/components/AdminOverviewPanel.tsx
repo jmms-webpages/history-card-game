@@ -3,7 +3,7 @@ import { CalendarDays, Calendar, Target, AlertTriangle, TrendingDown, RefreshCw,
 import { useQuestions } from '../context/QuestionsContext';
 import { UserProfile, AdminSubTab } from '../types';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
-import { loadWeekBaseline, weeklyTotals, WeekBaseline } from '../utils/publishSnapshot';
+import { loadWeekBaseline, weeklyTotals, weekStatus, WeekBaseline } from '../utils/publishSnapshot';
 import { accuracyOf, masteryTone, todayTotals, unitMasteryPct } from '../utils/adminStats';
 import { GOAL_METRIC_LABELS } from '../utils/snapshot';
 import { isUnassignedClass } from '../utils/classes';
@@ -51,6 +51,8 @@ export const AdminOverviewPanel: React.FC<Props> = ({ students, loading, publish
 
   const today = todayTotals(students);
   const week = weeklyTotals(students, baseline);
+  const status = weekStatus(baseline);
+  const needsWeek = status.state === 'none' || status.state === 'due' || status.state === 'overdue';
   const goal = gameSettings.classGoal;
   const goalNow = goal
     ? Math.max(
@@ -97,6 +99,18 @@ export const AdminOverviewPanel: React.FC<Props> = ({ students, loading, publish
         </button>
       </div>
 
+      {needsWeek && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 shadow">
+          <p className="text-xs text-amber-200 font-bold flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            {status.state === 'none' ? 'No weekly competition running. Start a new week to begin tracking weekly totals.' : `${status.label}. Start a new week to reset the weekly boards.`}
+          </p>
+          <button type="button" onClick={() => onGo('honor')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer">
+            Go to Start New Week
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className={card}>
           <h3 className={title}><CalendarDays className="w-4 h-4 text-emerald-400" /> Today</h3>
@@ -118,7 +132,7 @@ export const AdminOverviewPanel: React.FC<Props> = ({ students, loading, publish
             <>
               <p className="text-3xl font-black text-slate-100 font-mono">{week.questions.toLocaleString()}<span className="text-xs text-slate-400 font-normal ml-2">questions</span></p>
               <SplitBar right={week.correct} wrong={Math.max(0, week.questions - week.correct)} />
-              <p className="text-[11px] text-slate-500">Since {new Date(week.startedAt).toLocaleDateString()}</p>
+              <p className="text-[11px] text-slate-500">Since {new Date(week.startedAt).toLocaleDateString()} · {status.label}</p>
             </>
           )}
         </div>

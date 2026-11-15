@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Award, Target, Flame, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useQuestions } from '../context/QuestionsContext';
 import { UserProfile, ClassGoal } from '../types';
-import { startNewWeek } from '../utils/publishSnapshot';
+import { startNewWeek, loadWeekBaseline, weekStatus, WeekBaseline } from '../utils/publishSnapshot';
 import { GOAL_METRIC_LABELS } from '../utils/snapshot';
 
 interface Props {
@@ -22,6 +22,13 @@ export const AdminHonorPanel: React.FC<Props> = ({ students, busy, lastPublished
   const [goalTarget, setGoalTarget] = useState(5000);
   const [goalReward, setGoalReward] = useState(100);
   const [msg, setMsg] = useState<string | null>(null);
+  const [baseline, setBaseline] = useState<WeekBaseline | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadWeekBaseline().then(b => { if (!cancelled) setBaseline(b); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const status = weekStatus(baseline);
 
   const flash = (t: string) => {
     setMsg(t);
@@ -68,6 +75,7 @@ export const AdminHonorPanel: React.FC<Props> = ({ students, busy, lastPublished
     if (!window.confirm("Start a new weekly competition? Everyone's weekly totals reset to zero.")) return;
     try {
       await startNewWeek(students);
+      loadWeekBaseline().then(setBaseline).catch(() => {});
       flash('New week started. Publishing now so students see the fresh boards.');
       await onRefreshAndPublish();
     } catch (e: any) {
@@ -143,6 +151,11 @@ export const AdminHonorPanel: React.FC<Props> = ({ students, busy, lastPublished
         <p className="text-xs text-slate-400">
           Starting a new week records everyone's current totals; the weekly boards then show only what each student gains from here. Do this on Monday, then publish each day or two.
         </p>
+        <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${status.state === 'running' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200' : 'bg-amber-500/10 border-amber-500/40 text-amber-200'}`}>
+          {status.state === 'none'
+            ? 'No week started yet.'
+            : <>Current week started {new Date(baseline!.startedAt).toLocaleDateString()}. {status.label}{status.dueOn ? ` (${status.dueOn.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })})` : ''}.</>}
+        </div>
         <button type="button" className={btn} onClick={handleNewWeek} disabled={busy}>Start New Week</button>
       </div>
     </div>
