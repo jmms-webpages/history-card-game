@@ -22,6 +22,10 @@ interface OpenPackResult {
   packName: string;
 }
 
+// Fields a teacher may edit on a card (stored on the card's Firestore doc and merged over the built-in card).
+export type CardEdit = Partial<Pick<Card, 'name' | 'description' | 'rarity' | 'symbol' | 'flavorQuote' | 'historicalEra' | 'historicalSignificance'>>;
+const EDITABLE_CARD_FIELDS: (keyof CardEdit)[] = ['name', 'description', 'rarity', 'symbol', 'flavorQuote', 'historicalEra', 'historicalSignificance'];
+
 interface CardsContextType {
   cards: Card[];
   packs: Pack[];
@@ -48,6 +52,7 @@ interface CardsContextType {
   };
   addCustomCard: (card: Omit<Card, 'cardId'>) => void;
   toggleCardActive: (cardId: string) => void;
+  updateCard: (cardId: string, patch: CardEdit) => void;
   togglePackActive: (packId: string) => void;
 }
 
@@ -97,15 +102,22 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } catch {}
         }
         if (snap && snap.docs && snap.docs.length > 0) {
-          const overrides = new Map<string, boolean>();
+          const overrides = new Map<string, any>();
           snap.docs.forEach((d: any) => {
             const data = d.data();
-            if (data?.cardId && typeof data.active === 'boolean') {
-              overrides.set(data.cardId, data.active);
-            }
+            if (data?.cardId) overrides.set(data.cardId, data);
           });
           setCards(prev => {
-            const updated = prev.map(c => overrides.has(c.cardId) ? { ...c, active: overrides.get(c.cardId)! } : c);
+            const updated = prev.map(c => {
+              const o = overrides.get(c.cardId);
+              if (!o) return c;
+              const next: any = { ...c };
+              if (typeof o.active === 'boolean') next.active = o.active;
+              EDITABLE_CARD_FIELDS.forEach(f => {
+                if (typeof o[f] === 'string' && (o[f] as string).length > 0) next[f] = o[f];
+              });
+              return next as Card;
+            });
             try {
               localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
             } catch {}
@@ -581,6 +593,27 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const updateCard = (cardId: string, patch: CardEdit) => {
+    const clean: CardEdit = {};
+    EDITABLE_CARD_FIELDS.forEach(f => {
+      const v = (patch as any)[f];
+      if (typeof v === 'string' && v.trim().length > 0) (clean as any)[f] = v.trim();
+    });
+    const updated = cards.map(c => (c.cardId === cardId ? { ...c, ...clean } : c));
+    setCards(updated);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      setDoc(doc(db, 'cards', cardId), { cardId, ...clean }, { merge: true }).catch(e => {
+        console.warn('Card edit sync notice:', e);
+      });
+    }
+    updateGameSettings({ catalogVersion: Date.now() });
+  };
+
   const toggleCardActive = (cardId: string) => {
     let newActive = true;
     const updated = cards.map(c => {
@@ -626,6 +659,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       stats,
       addCustomCard,
       toggleCardActive,
+      updateCard,
       togglePackActive
     }}>
       {children}

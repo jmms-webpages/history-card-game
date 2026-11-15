@@ -38,6 +38,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
     cards,
     packs,
     toggleCardActive,
+    updateCard,
     togglePackActive
   } = useCards();
 
@@ -228,6 +229,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [questionSearch, setQuestionSearch] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [cardDraft, setCardDraft] = useState<Record<string, string>>({});
   const [newQText, setNewQText] = useState('');
   const [newAnswers, setNewAnswers] = useState(['', '', '', '']);
   const [newCorrectIdx, setNewCorrectIdx] = useState(0);
@@ -843,7 +846,59 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
           {/* Cards List */}
           <div className="space-y-3">
-            {filteredCards.map(card => (
+            {filteredCards.map(card => editingCardId === card.cardId ? (
+              <form
+                key={card.cardId}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  updateCard(card.cardId, cardDraft as any);
+                  setEditingCardId(null);
+                }}
+                className="bg-slate-900 border border-amber-400/50 rounded-2xl p-4 sm:p-5 space-y-3"
+              >
+                <p className="text-[11px] font-mono text-amber-400">Editing {card.cardId} · {card.packTheme}</p>
+                {([
+                  ['name', 'Name'],
+                  ['symbol', 'Symbol (emoji)'],
+                  ['historicalEra', 'Era'],
+                  ['description', 'Description'],
+                  ['historicalSignificance', 'Historical significance'],
+                  ['flavorQuote', 'Flavor quote']
+                ] as [string, string][]).map(([field, label]) => (
+                  <label key={field} className="block text-[11px] text-slate-400">
+                    {label}
+                    {field === 'description' || field === 'historicalSignificance' || field === 'flavorQuote' ? (
+                      <textarea
+                        rows={2}
+                        value={cardDraft[field] ?? ''}
+                        onChange={(e) => setCardDraft({ ...cardDraft, [field]: e.target.value })}
+                        className="mt-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:border-amber-400 focus:outline-none"
+                      />
+                    ) : (
+                      <input
+                        value={cardDraft[field] ?? ''}
+                        onChange={(e) => setCardDraft({ ...cardDraft, [field]: e.target.value })}
+                        className="mt-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:border-amber-400 focus:outline-none"
+                      />
+                    )}
+                  </label>
+                ))}
+                <label className="block text-[11px] text-slate-400">
+                  Rarity
+                  <select
+                    value={cardDraft.rarity ?? card.rarity}
+                    onChange={(e) => setCardDraft({ ...cardDraft, rarity: e.target.value })}
+                    className="mt-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:border-amber-400 focus:outline-none"
+                  >
+                    {['Common', 'Uncommon', 'Rare', 'Legendary', 'Mythical'].map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </label>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={() => setEditingCardId(null)} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 cursor-pointer">Cancel</button>
+                  <button type="submit" className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer">Save Card</button>
+                </div>
+              </form>
+            ) : (
               <div
                 key={card.cardId}
                 className={`bg-slate-900 border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
@@ -882,6 +937,25 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCardDraft({
+                        name: card.name || '',
+                        symbol: card.symbol || '',
+                        historicalEra: card.historicalEra || '',
+                        description: card.description || '',
+                        historicalSignificance: card.historicalSignificance || '',
+                        flavorQuote: card.flavorQuote || '',
+                        rarity: card.rarity
+                      });
+                      setEditingCardId(card.cardId);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => toggleCardActive(card.cardId)}
