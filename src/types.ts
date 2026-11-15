@@ -177,6 +177,7 @@ export interface GameSettings {
   closedPacks?: string[];
   // While true, students see a maintenance screen instead of the game.
   maintenanceMode?: boolean;
+  disabledUnitIds?: string[]; // units whose questions are switched off for students
   // Bumped whenever the question bank or card catalog changes. Devices only
   // re-read those collections when this number differs from what they saved.
   catalogVersion?: number;
