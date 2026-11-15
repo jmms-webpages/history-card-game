@@ -76,15 +76,26 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_CARDS;
   });
 
+  const catalogVersion = gameSettings.catalogVersion ?? 0;
   useEffect(() => {
-    // Skip the read entirely if we fetched the card toggles recently.
-    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('cards')) return;
+    // Re-read the card toggles only when the teacher changed the catalog, or after 12 hours.
+    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    let seen = '';
+    try {
+      seen = localStorage.getItem('hcq_cards_version') || '';
+    } catch {}
+    if (seen === String(catalogVersion) && isFresh('cards', 12 * 60 * 60 * 1000)) return;
     (async () => {
       try {
         const cardsColl = collection(db, 'cards');
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
         const snap = await Promise.race([getDocs(cardsColl), timeout]) as any;
-        if (snap && snap.docs) markFetched('cards');
+        if (snap && snap.docs) {
+          markFetched('cards');
+          try {
+            localStorage.setItem('hcq_cards_version', String(catalogVersion));
+          } catch {}
+        }
         if (snap && snap.docs && snap.docs.length > 0) {
           const overrides = new Map<string, boolean>();
           snap.docs.forEach((d: any) => {
@@ -105,7 +116,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Card catalog fetch notice (using cached cards):', e);
       }
     })();
-  }, []);
+  }, [catalogVersion]);
 
   const closedPacks = gameSettings.closedPacks || [];
 
@@ -592,6 +603,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Card catalog sync notice:', e);
       });
     }
+    updateGameSettings({ catalogVersion: Date.now() });
   };
 
   return (

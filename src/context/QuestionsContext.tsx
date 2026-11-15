@@ -161,12 +161,16 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
+  // Settings are one small document. Pulled when the app opens and then every
+  // few minutes while the tab is visible, so a class goal, closed pack or
+  // maintenance switch reaches students without a reload.
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !doc || !getDoc || isFresh('settings', SETTINGS_TTL_MS)) return;
-    (async () => {
+    if (!isFirebaseConfigured || !db || !doc || !getDoc) return;
+    const pull = async (ttlMs: number) => {
+      if (isFresh('settings', ttlMs)) return;
       try {
         const settingsRef = doc(db, 'settings', 'gameSettings');
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
         const snap = await Promise.race([getDoc(settingsRef), timeout]) as any;
         if (snap && typeof snap.exists === 'function') markFetched('settings');
         if (snap && typeof snap.exists === 'function' && snap.exists()) {
@@ -179,7 +183,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } catch (e) {
         console.warn('Game settings fetch notice (using cached settings):', e);
       }
-    })();
+    };
+    pull(SETTINGS_OPEN_TTL_MS);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') pull(SETTINGS_POLL_MS - 15000);
+    }, SETTINGS_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pull(SETTINGS_OPEN_TTL_MS);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const updateGameSettings = (updates: Partial<GameSettings>) => {
@@ -192,11 +208,15 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
     if (isFirebaseConfigured && db && doc && setDoc) {
       const settingsRef = doc(db, 'settings', 'gameSettings');
-      setDoc(settingsRef, next, { merge: true }).catch(e => {
+      // Only the changed fields are written, so two teachers editing different
+      // settings can't overwrite each other with stale copies.
+      setDoc(settingsRef, updates, { merge: true }).catch(e => {
         console.warn('Game settings sync notice:', e);
       });
     }
   };
+
+  const bumpCatalogVersion = () => updateGameSettings({ catalogVersion: Date.now() });
 
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
@@ -220,15 +240,26 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
   };
 
+  // The question collection is only re-read when the teacher has changed the
+  // catalog (catalogVersion) or after 12 hours, not on a timer.
+  const catalogVersion = gameSettings.catalogVersion ?? 0;
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || !collection || !getDocs || isFresh('questions')) return;
+    if (!isFirebaseConfigured || !db || !collection || !getDocs) return;
+    let seen = '';
+    try {
+      seen = localStorage.getItem('hcq_questions_version') || '';
+    } catch {}
+    if (seen === String(catalogVersion) && isFresh('questions', 12 * 60 * 60 * 1000)) return;
     (async () => {
       try {
         const questionsColl = collection(db, 'questions');
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
         const snap = await Promise.race([getDocs(questionsColl), timeout]) as any;
         if (snap && snap.docs) {
           markFetched('questions');
+          try {
+            localStorage.setItem('hcq_questions_version', String(catalogVersion));
+          } catch {}
           const remoteDocs = snap.docs.map((d: any) => d.data());
           setQuestions(prev => {
             const merged = mergeRemoteQuestions(prev, remoteDocs);
@@ -242,7 +273,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.warn('Question bank fetch notice (using cached questions):', e);
       }
     })();
-  }, []);
+  }, [catalogVersion]);
 
   const activityStorageKey = `ohio_daily_activity_${userProfile?.uid || 'guest'}_${todayKey}`;
 
@@ -595,6 +626,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const qRef = doc(db, 'questions', questionId);
       setDoc(qRef, fullQuestion).catch(e => console.warn('Question sync notice:', e));
     }
+    bumpCatalogVersion();
   };
 
   // Edits any question (built-in or custom). The full edited question is
@@ -606,6 +638,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (full && isFirebaseConfigured && db && doc && setDoc) {
       setDoc(doc(db, 'questions', questionId), full, { merge: true }).catch(e => console.warn('Question sync notice:', e));
     }
+    bumpCatalogVersion();
   };
 
   const toggleQuestionActive = (questionId: string) => {
@@ -626,6 +659,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const payload = isCustom && fullQuestion ? fullQuestion : { questionId, active: newActive };
       setDoc(qRef, payload, { merge: true }).catch(e => console.warn('Question sync notice:', e));
     }
+    bumpCatalogVersion();
   };
 
   const deleteQuestion = (questionId: string) => {
@@ -640,6 +674,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const qRef = doc(db, 'questions', questionId);
       deleteDoc(qRef).catch(e => console.warn('Question delete sync notice:', e));
     }
+    bumpCatalogVersion();
   };
 
   const resetDailyActivity = () => {
@@ -705,7 +740,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 // Short on purpose: class goals, closed packs and the focus unit should reach
 // students within minutes. It is one document read per student per window.
-const SETTINGS_TTL_MS = 5 * 60 * 1000;
+const SETTINGS_POLL_MS = 4 * 60 * 1000;
+const SETTINGS_OPEN_TTL_MS = 2 * 60 * 1000;
 
 export const useQuestions = () => {
   const context = useContext(QuestionsContext);

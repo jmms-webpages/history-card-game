@@ -22,6 +22,7 @@ export interface UserProfile {
   totalCorrectAnswersLifetime?: number;
   // Today's daily-question counts, so the teacher overview can total a day
   // without any extra reads. Reset whenever todayDate is not today.
+  updatedAt?: number; // ms; lets the teacher roster sync only changed profiles
   todayDate?: string;
   todayQuestions?: number;
   todayCorrect?: number;
@@ -171,6 +172,11 @@ export interface GameSettings {
   // Pack ids the teacher has closed. Lives in the settings doc students already
   // read, so closing a pack costs no extra reads.
   closedPacks?: string[];
+  // While true, students see a maintenance screen instead of the game.
+  maintenanceMode?: boolean;
+  // Bumped whenever the question bank or card catalog changes. Devices only
+  // re-read those collections when this number differs from what they saved.
+  catalogVersion?: number;
   focusUnitId?: string;
   focusCorrectReward?: number; // 15 or 20
   reviewCoinReward?: number; // 0 or 3
@@ -218,4 +224,4 @@ export type NavigationTab =
   | 'admin'
   | 'student-view';
 
-export type AdminSubTab = 'overview' | 'classes' | 'honor' | 'submissions' | 'questions' | 'cards' | 'packs';
+export type AdminSubTab = 'overview' | 'classes' | 'honor' | 'submissions' | 'questions' | 'packs';
