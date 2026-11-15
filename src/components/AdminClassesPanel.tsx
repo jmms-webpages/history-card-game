@@ -4,7 +4,7 @@ import { isFirebaseConfigured, db, doc, updateDoc } from '../firebase/config';
 import { useQuestions } from '../context/QuestionsContext';
 import { ClassInfo, UserProfile } from '../types';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
-import { accuracyOf, masteryTone, overallMasteryPct, unitMasteryPct } from '../utils/adminStats';
+import { accuracyColor, accuracyOf, masteryTone, overallMasteryPct, unitMasteryPct } from '../utils/adminStats';
 import {
   ClassKeys,
   classLabel,
@@ -182,6 +182,9 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefres
     const a = accuracyOf(list);
     return a.pct === null ? '—' : `${a.pct}%`;
   };
+  const AccText: React.FC<{ list: UserProfile[] }> = ({ list }) => (
+    <span className={`font-bold ${accuracyColor(accuracyOf(list).pct)}`}>{accText(list)}</span>
+  );
 
   const StudentRow: React.FC<{ s: UserProfile }> = ({ s }) => {
     const a = accuracyOf([s]);
@@ -190,7 +193,7 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefres
         <div className="min-w-0 flex items-center gap-3">
           <span className="font-bold text-slate-100 text-xs">{s.displayName}</span>
           <span className="font-mono text-slate-400">
-            {a.pct === null ? 'no answers yet' : `${a.pct}% accuracy (${a.questions})`}
+            {a.pct === null ? 'no answers yet' : <><span className={`font-bold ${accuracyColor(a.pct)}`}>{a.pct}%</span> accuracy ({a.questions})</>}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -326,7 +329,7 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefres
           return (
             <div key={teacherName}>
               <p className="text-[11px] uppercase tracking-wider font-mono text-slate-500 mb-1.5">
-                {teacherName} · {teacherStudents.length} students · {accText(teacherStudents)} accuracy · {ta.questions.toLocaleString()} questions
+                {teacherName} · {teacherStudents.length} students · <AccText list={teacherStudents} /> accuracy · {ta.questions.toLocaleString()} questions
               </p>
               <div className="space-y-1.5">
                 {list.map(cls => {
@@ -340,7 +343,7 @@ export const AdminClassesPanel: React.FC<Props> = ({ students, loading, onRefres
                           {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
                           <span className="font-bold text-slate-100">{cls.name}</span>
                           <span className="text-slate-500">{members.length} students</span>
-                          <span className="text-slate-400 font-mono">{accText(members)} accuracy</span>
+                          <span className="text-slate-400 font-mono"><AccText list={members} /> accuracy</span>
                           <span className="text-slate-400 font-mono">{ca.questions.toLocaleString()} questions</span>
                         </button>
                         <div className="flex items-center gap-2">

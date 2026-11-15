@@ -4,7 +4,7 @@ import { useQuestions } from '../context/QuestionsContext';
 import { UserProfile, AdminSubTab } from '../types';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { loadWeekBaseline, weeklyTotals, weekStatus, WeekBaseline } from '../utils/publishSnapshot';
-import { accuracyOf, masteryTone, todayTotals, unitMasteryPct } from '../utils/adminStats';
+import { accuracyColor, accuracyOf, masteryTone, todayTotals, unitMasteryPct } from '../utils/adminStats';
 import { GOAL_METRIC_LABELS } from '../utils/snapshot';
 import { isUnassignedClass } from '../utils/classes';
 
@@ -32,7 +32,7 @@ const SplitBar: React.FC<{ right: number; wrong: number }> = ({ right, wrong }) 
       </div>
       <div className="flex justify-between text-[11px] font-mono mt-1">
         <span className="text-emerald-300">{right.toLocaleString()} right</span>
-        <span className="text-slate-400">{total > 0 ? `${pct}%` : '—'}</span>
+        <span className={`font-bold ${total > 0 ? accuracyColor(pct) : 'text-slate-400'}`}>{total > 0 ? `${pct}%` : '—'}</span>
         <span className="text-rose-300">{wrong.toLocaleString()} wrong</span>
       </div>
     </div>
@@ -177,7 +177,7 @@ export const AdminOverviewPanel: React.FC<Props> = ({ students, loading, publish
             )}
             <li className="flex items-center justify-between gap-3">
               <span>School-wide accuracy</span>
-              <span className="font-mono font-bold text-slate-200">{schoolAcc.pct === null ? '—' : `${schoolAcc.pct}%`}</span>
+              <span className={`font-mono font-bold ${accuracyColor(schoolAcc.pct)}`}>{schoolAcc.pct === null ? '—' : `${schoolAcc.pct}%`}</span>
             </li>
           </ul>
         </div>

@@ -32,6 +32,16 @@ export const overallMasteryPct = (list: UserProfile[]): number =>
           100
       );
 
+// Accuracy colors: <=59 red, 60-69 orange, 70-79 yellow, 80-89 green, 90+ light blue.
+export const accuracyColor = (pct: number | null | undefined): string => {
+  if (pct === null || pct === undefined) return 'text-slate-500';
+  if (pct <= 59) return 'text-red-400';
+  if (pct <= 69) return 'text-orange-400';
+  if (pct <= 79) return 'text-yellow-300';
+  if (pct <= 89) return 'text-emerald-400';
+  return 'text-sky-300';
+};
+
 export const masteryTone = (pct: number): string =>
   pct < 40 ? 'text-rose-300 bg-rose-500/10' : pct < 70 ? 'text-amber-300 bg-amber-500/10' : 'text-emerald-300 bg-emerald-500/10';
 

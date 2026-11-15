@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
+import { accuracyColor } from '../utils/adminStats';
 import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
 export const QuestionsView: React.FC = () => {
@@ -576,7 +577,7 @@ export const QuestionsView: React.FC = () => {
               <span className="text-xs text-slate-400 font-medium">Daily Accuracy</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-2xl font-black text-slate-100 font-mono mt-1">
+            <p className={`text-2xl font-black font-mono mt-1 ${questionsAnswered > 0 ? accuracyColor(accuracyPercent) : 'text-slate-100'}`}>
               {accuracyPercent}%
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5">
