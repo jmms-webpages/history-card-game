@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Target, CalendarClock, Star, Users, Gift, Coins, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Target, CalendarClock, Star, Gift, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useQuestions } from '../context/QuestionsContext';
-import { useCards } from '../context/CardsContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { NavigationTab } from '../types';
 import { Snapshot, fetchSnapshot, getGoalProgress, GOAL_METRIC_LABELS } from '../utils/snapshot';
@@ -76,23 +75,24 @@ export const ClassGoalCard: React.FC<{ snapshot: Snapshot | null }> = ({ snapsho
   );
 };
 
-const bannerBase = 'rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
-
-export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) => void }> = ({ onNavigate }) => {
-  const { userProfile } = useAuth();
-  const { gameSettings, reviewQueueCount } = useQuestions();
-  const { cards, isCardOwned } = useCards();
+// Goal card with its own snapshot read (only when a goal exists; cached 10 min).
+export const DashboardGoal: React.FC = () => {
+  const { gameSettings } = useQuestions();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-
   const goalId = gameSettings.classGoal?.goalId;
   useEffect(() => {
-    // Only read the snapshot when there's a goal to show progress for.
     if (!goalId) return;
     let cancelled = false;
     fetchSnapshot(false).then(s => { if (!cancelled) setSnapshot(s); });
     return () => { cancelled = true; };
   }, [goalId]);
+  return <ClassGoalCard snapshot={snapshot} />;
+};
 
+// The major things a student should know right now. All from data already loaded.
+export const DashboardReminders: React.FC<{ onNavigate: (tab: NavigationTab) => void }> = ({ onNavigate }) => {
+  const { userProfile } = useAuth();
+  const { gameSettings, reviewQueueCount } = useQuestions();
   if (!userProfile) return null;
 
   const focusUnit = gameSettings.focusUnitId
@@ -115,79 +115,56 @@ export const DashboardEngagement: React.FC<{ onNavigate: (tab: NavigationTab) =>
     }))
     .filter(x => !Number.isNaN(x.days) && x.days >= 0 && x.days <= 21)
     .sort((x, y) => x.days - y.days)
-    .slice(0, 2);
+    .slice(0, 3);
 
-  // "So close!" nudge: the started unit that needs the fewest more cards.
-  const activeCards = cards.filter(c => c.active);
-  let nudge: { name: string; left: number } | null = null;
-  for (const u of INITIAL_UNITS) {
-    const unitCards = activeCards.filter(c => c.unitId === u.unitId);
-    if (unitCards.length === 0) continue;
-    const owned = unitCards.filter(c => isCardOwned(c.cardId)).length;
-    const left = unitCards.length - owned;
-    if (owned > 0 && left > 0 && (nudge === null || left < nudge.left)) nudge = { name: u.unitName, left };
+  const row = 'flex items-center justify-between gap-3 rounded-xl border p-3 text-xs';
+  const items: React.ReactNode[] = [];
+
+  upcoming.forEach(({ test, days }) => {
+    items.push(
+      <div key={test.id || `${test.label}-${test.date}`} className={`${row} bg-rose-500/10 border-rose-500/40 text-rose-100`}>
+        <span className="flex items-center gap-2.5">
+          <CalendarClock className="w-4 h-4 text-rose-300 shrink-0" />
+          <span><strong>{test.label}</strong> {days === 0 ? 'is today!' : days === 1 ? 'is tomorrow.' : `is in ${days} days.`}</span>
+        </span>
+      </div>
+    );
+  });
+
+  if (reviewQueueCount > 0) {
+    items.push(
+      <div key="review" className={`${row} bg-indigo-500/10 border-indigo-500/30 text-indigo-100`}>
+        <span><strong>{reviewQueueCount}</strong> missed question{reviewQueueCount === 1 ? '' : 's'} to review</span>
+        <button type="button" onClick={() => onNavigate('questions')} className="px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold cursor-pointer whitespace-nowrap flex items-center gap-1">
+          Review <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
+  if (focusUnit) {
+    items.push(
+      <div key="focus" className={`${row} bg-amber-500/10 border-amber-500/40 text-amber-100`}>
+        <span className="flex items-center gap-2.5">
+          <Star className="w-4 h-4 text-amber-400 shrink-0" />
+          <span><strong>Focus: {focusUnit.unitName}</strong> pays +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins per correct answer.</span>
+        </span>
+        <button type="button" onClick={() => onNavigate('questions')} className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer whitespace-nowrap">
+          Answer
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      {upcoming.map(({ test, days: testDays }) => (
-        <div key={test.id || `${test.label}-${test.date}`} className={`${bannerBase} bg-rose-500/10 border-rose-500/40`}>
-          <div className="flex items-center gap-3 text-xs text-rose-100">
-            <CalendarClock className="w-5 h-5 text-rose-300 shrink-0" />
-            <span>
-              <strong>{test.label}</strong> {testDays === 0 ? 'is today!' : testDays === 1 ? 'is tomorrow.' : `is in ${testDays} days.`}{' '}
-              {reviewQueueCount > 0
-                ? `You have ${reviewQueueCount} missed question${reviewQueueCount === 1 ? '' : 's'} to review.`
-                : 'Keep practicing to stay sharp.'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('questions')}
-            className="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold cursor-pointer whitespace-nowrap flex items-center gap-1.5"
-          >
-            {reviewQueueCount > 0 ? 'Review Now' : 'Practice'} <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
-
-      {focusUnit && (
-        <div className={`${bannerBase} bg-amber-500/10 border-amber-500/40`}>
-          <div className="flex items-center gap-3 text-xs text-amber-100">
-            <Star className="w-5 h-5 text-amber-400 shrink-0" />
-            <span>
-              <strong>Unit Focus: {focusUnit.unitName}.</strong> Correct answers in this unit pay{' '}
-              <strong>+{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins</strong> instead of +{gameSettings.correctCoinReward}.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('questions')}
-            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer whitespace-nowrap"
-          >
-            Answer Questions
-          </button>
-        </div>
-      )}
-
-      <ClassGoalCard snapshot={snapshot} />
-
-      {nudge && (
-        <div className={`${bannerBase} bg-slate-900 border-slate-800`}>
-          <div className="flex items-center gap-3 text-xs text-slate-300">
-            <Coins className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span>
-              So close! You're only <strong className="text-emerald-300">{nudge.left} card{nudge.left === 1 ? '' : 's'}</strong> away from completing <strong>{nudge.name}</strong>.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('packs')}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold cursor-pointer whitespace-nowrap"
-          >
-            Open Packs
-          </button>
-        </div>
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow space-y-3">
+      <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
+        <CalendarClock className="w-4 h-4 text-rose-300" /> Reminders
+      </h3>
+      {items.length > 0 ? (
+        <div className="space-y-2">{items}</div>
+      ) : (
+        <p className="text-xs text-slate-500">Nothing urgent. You're all caught up!</p>
       )}
     </div>
   );

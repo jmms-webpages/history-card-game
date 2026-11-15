@@ -14,11 +14,10 @@ import { AuthView } from './components/AuthView';
 import { DashboardView } from './components/DashboardView';
 import { QuestionsView } from './components/QuestionsView';
 import { PacksView } from './components/PacksView';
-import { CollectionView } from './components/CollectionView';
+import { BindersView } from './components/BindersView';
 import { ProfileView } from './components/ProfileView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { LeaderboardView } from './components/LeaderboardView';
-import { ClassBinderView } from './components/ClassBinderView';
 import { ContributeView } from './components/ContributeView';
 import { SetupView } from './components/SetupView';
 import { isUnassignedClass } from './utils/classes';
@@ -115,9 +114,9 @@ const MainAppContent: React.FC = () => {
           {tab === 'questions' && <QuestionsView mode="daily" onNavigate={setCurrentTab} />}
           {tab === 'practice' && <QuestionsView mode="practice" onNavigate={setCurrentTab} />}
           {tab === 'packs' && <PacksView onNavigate={setCurrentTab} />}
-          {tab === 'collection' && <CollectionView onNavigate={setCurrentTab} />}
+          {tab === 'collection' && <BindersView onNavigate={setCurrentTab} />}
           {tab === 'leaderboard' && <LeaderboardView onNavigateTab={setCurrentTab} />}
-          {tab === 'classbinder' && <ClassBinderView onNavigate={setCurrentTab} />}
+          {tab === 'classbinder' && <BindersView onNavigate={setCurrentTab} initialOpen="class" />}
           {tab === 'contribute' && <ContributeView />}
           {tab === 'profile' && <ProfileView />}
           {tab === 'admin' && (

@@ -47,9 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, admin
     { id: 'questions', label: 'Daily Trivia', icon: <HelpCircle className="w-4 h-4" /> },
     { id: 'practice', label: 'Practice', icon: <BookOpen className="w-4 h-4" /> },
     { id: 'packs', label: 'Card Packs', icon: <Package className="w-4 h-4" /> },
-    { id: 'collection', label: 'Card Binder', icon: <Library className="w-4 h-4" /> },
+    { id: 'collection', label: 'Binders', icon: <Library className="w-4 h-4" /> },
     { id: 'leaderboard', label: 'Honor Roll & Achievements', icon: <Trophy className="w-4 h-4" /> },
-    { id: 'classbinder', label: 'Class Binder', icon: <Users className="w-4 h-4" /> },
     { id: 'contribute', label: 'Write a Question', icon: <Pencil className="w-4 h-4" /> },
     { id: 'profile', label: 'My Scholar Profile', icon: <User className="w-4 h-4" /> }
   ];

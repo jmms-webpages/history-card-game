@@ -8,9 +8,10 @@ import { INITIAL_UNITS } from '../data/initialCurriculum';
 import { MASTERY_TARGET_POINTS } from '../context/AuthContext';
 import { getTodayKey } from '../context/QuestionsContext';
 import { CardDetailModal } from './CardDetailModal';
-import { DashboardEngagement } from './EngagementBanners';
+import { DashboardGoal, DashboardReminders } from './EngagementBanners';
+import { accuracyColor } from '../utils/adminStats';
 import { RARITY_COLORS } from '../data/cards';
-import { Coins, Package, Library, CheckCircle2, BookOpen, Sparkles, ArrowRight, Calendar } from 'lucide-react';
+import { Coins, Package, Library, CheckCircle2, Sparkles, ArrowRight, Calendar, CalendarDays, TrendingDown } from 'lucide-react';
 import { AvatarFace } from './AvatarFace';
 
 interface DashboardViewProps {
@@ -19,7 +20,7 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { userProfile } = useAuth();
-  const { dailyActivity, gameSettings } = useQuestions();
+  const { dailyActivity, gameSettings, setPracticeUnitIds } = useQuestions();
   const { stats, inventoryCards, isCardOwned, getCardCopies, cards } = useCards();
 
   // Same card for the whole class each day -- a deterministic pick from
@@ -44,7 +45,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const currentAvatar = getAvatarById(userProfile.avatar);
   const dailyAnswered = dailyActivity?.questionsAnswered ?? 0;
   const dailyLimit = gameSettings?.dailyQuestionLimit ?? 10;
-  const recentPulls = [...inventoryCards].reverse().slice(0, 5);
+
+  // Today / this week (Mon-Sun), straight from the student's own profile.
+  const todayKey = getTodayKey();
+  const todayQ = userProfile.todayDate === todayKey ? userProfile.todayQuestions || 0 : 0;
+  const todayC = userProfile.todayDate === todayKey ? userProfile.todayCorrect || 0 : 0;
+  const nowD = new Date();
+  const mon = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - ((nowD.getDay() + 6) % 7));
+  const weekKey = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+  const weekQ = userProfile.weekDate === weekKey ? userProfile.weekQuestions || 0 : 0;
+  const weekC = userProfile.weekDate === weekKey ? userProfile.weekCorrect || 0 : 0;
+
+  const split = (right: number, total: number) => {
+    const pct = total > 0 ? Math.round((right / total) * 100) : null;
+    return (
+      <div>
+        <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-950 border border-slate-800">
+          {total > 0 && (
+            <>
+              <div className="bg-emerald-500" style={{ width: `${(right / total) * 100}%` }} />
+              <div className="bg-rose-500" style={{ width: `${((total - right) / total) * 100}%` }} />
+            </>
+          )}
+        </div>
+        <div className="flex justify-between text-[11px] font-mono mt-1">
+          <span className="text-emerald-300">{right} right</span>
+          <span className={`font-bold ${accuracyColor(pct)}`}>{pct === null ? '—' : `${pct}%`}</span>
+          <span className="text-rose-300">{total - right} wrong</span>
+        </div>
+      </div>
+    );
+  };
+
+  // The three weakest units, each with a one-click practice button.
+  const weakest = INITIAL_UNITS.map((unit, i) => {
+    const points = userProfile.unitMastery?.[unit.unitId] || 0;
+    return { unit, num: i + 1, percent: Math.min(100, Math.round((points / MASTERY_TARGET_POINTS) * 100)) };
+  }).sort((a, b) => a.percent - b.percent).slice(0, 3);
+  const practiceUnit = (unitId: string) => {
+    setPracticeUnitIds([unitId]);
+    onNavigate('practice');
+  };
+
+  const cardCls = 'bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow space-y-3';
 
   return (
     <div className="space-y-8 pb-16 animate-fadeIn">
@@ -88,33 +131,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Daily Question Progress Card */}
-            <div className="bg-slate-950/80 border border-slate-700 rounded-2xl p-4 w-full sm:w-auto min-w-[200px]">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-                <span className="flex items-center gap-1 font-medium text-slate-300">
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                  Daily Limit
-                </span>
-                <span className="font-mono text-amber-400 font-bold">
-                  {dailyAnswered} / {dailyLimit}
-                </span>
-              </div>
-              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, (dailyAnswered / dailyLimit) * 100)}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-                <span>{gameSettings?.correctCoinReward ?? 10} coins / correct</span>
-                <span className="text-amber-400 font-medium">{Math.max(0, dailyLimit - dailyAnswered)} left</span>
-              </p>
-            </div>
           </div>
         </div>
       </div>
 
-      <DashboardEngagement onNavigate={onNavigate} />
+      <div className={`grid grid-cols-1 gap-4 ${gameSettings?.classGoal ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+        <div className={cardCls}>
+          <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><CalendarDays className="w-4 h-4 text-emerald-400" /> Today</h3>
+          <p className="text-3xl font-black text-slate-100 font-mono">{dailyAnswered}<span className="text-xs text-slate-400 font-normal ml-2">/ {dailyLimit} daily questions</span></p>
+          <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+            <div className="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (dailyAnswered / dailyLimit) * 100)}%` }} />
+          </div>
+          {split(todayC, todayQ)}
+        </div>
+        <div className={cardCls}>
+          <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><Calendar className="w-4 h-4 text-sky-400" /> This Week</h3>
+          <p className="text-3xl font-black text-slate-100 font-mono">{weekQ}<span className="text-xs text-slate-400 font-normal ml-2">questions</span></p>
+          {split(weekC, weekQ)}
+        </div>
+        <DashboardGoal />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <DashboardReminders onNavigate={onNavigate} />
+        <div className={cardCls}>
+          <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2"><TrendingDown className="w-4 h-4 text-amber-400" /> Lowest Mastery</h3>
+          <div className="space-y-3">
+            {weakest.map(({ unit, num, percent }) => (
+              <div key={unit.unitId} className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-slate-200 truncate">Unit {num}: {unit.unitName}</span>
+                    <span className="font-mono font-bold text-amber-400 ml-2">{percent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400" style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+                <button type="button" onClick={() => practiceUnit(unit.unitId)} className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-bold cursor-pointer whitespace-nowrap">
+                  Practice
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Collection Binder Progress Summary Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -224,50 +285,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       )}
-
-      {/* Unit Mastery -- consistency-building tracker, private to this student */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-5 h-5 text-amber-400" />
-          <h2 className="text-lg font-bold text-slate-100">Unit Mastery</h2>
-        </div>
-        <p className="text-xs text-slate-400 mb-5">
-          Every correct answer builds mastery in that unit; a miss only costs half as much. Keep answering consistently to fill each bar.
-        </p>
-        <div className="space-y-4">
-          {INITIAL_UNITS.map((unit) => {
-            const points = userProfile.unitMastery?.[unit.unitId] || 0;
-            const percent = Math.min(100, Math.round((points / MASTERY_TARGET_POINTS) * 100));
-            const tierLabel =
-              percent >= 100 ? 'Mastered!' :
-              percent >= 90 ? 'Nearly Mastered' :
-              percent >= 60 ? 'Locked In' :
-              percent >= 25 ? 'Getting Consistent' :
-              'Building Foundations';
-            const tierColor =
-              percent >= 100 ? 'text-emerald-400' :
-              percent >= 60 ? 'text-amber-400' :
-              'text-slate-400';
-
-            return (
-              <div key={unit.unitId}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-200">{unit.unitName}</span>
-                  <span className={`font-mono font-bold ${tierColor}`}>{tierLabel} · {percent}%</span>
-                </div>
-                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      percent >= 100 ? 'bg-emerald-400' : 'bg-gradient-to-r from-amber-500 to-amber-400'
-                    }`}
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Card Detail Inspection Modal */}
       {inspectCard && (

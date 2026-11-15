@@ -5,12 +5,14 @@ import { CardItem } from './CardItem';
 import { CardDetailModal } from './CardDetailModal';
 import { Card, CardRarity } from '../types';
 import { RARITY_COLORS } from '../data/cards';
+import { INITIAL_UNITS } from '../data/initialCurriculum';
 
 interface CollectionViewProps {
   onNavigate?: (tab: any) => void;
+  embedded?: boolean; // inside the Binders page: no big page title, starts on Unit 1
 }
 
-export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) => {
+export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate, embedded = false }) => {
   const { 
     cards, 
     inventory, 
@@ -24,7 +26,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState<string>('all');
+  const [selectedUnit, setSelectedUnit] = useState<string>(embedded ? INITIAL_UNITS[0].unitId : 'all');
   const [selectedRarity, setSelectedRarity] = useState<string>('all');
   const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'owned' | 'missing'>('all');
   const [sortBy, setSortBy] = useState<'curriculum' | 'rarity' | 'name' | 'copies'>('curriculum');
@@ -126,13 +128,17 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold mb-2">
-              <Library className="w-3.5 h-3.5" />
-              <span>Your Collection</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">
-              History Collection Binder
-            </h1>
+            {!embedded && (
+              <>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold mb-2">
+                  <Library className="w-3.5 h-3.5" />
+                  <span>Your Collection</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">
+                  History Collection Binder
+                </h1>
+              </>
+            )}
             <p className="text-sm text-slate-400 mt-1 max-w-xl">
               Collect key figures, documents, battles, and artifacts from Ohio and U.S. history.
             </p>
@@ -214,6 +220,32 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ onNavigate }) =>
             <span>{toastMessage}</span>
           </div>
         )}
+      </div>
+
+      {/* Unit buttons: browse one unit at a time instead of one long scroll */}
+      <div className="flex flex-wrap gap-2">
+        {INITIAL_UNITS.map((u, i) => (
+          <button
+            key={u.unitId}
+            type="button"
+            title={u.unitName}
+            onClick={() => setSelectedUnit(u.unitId)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-colors ${
+              selectedUnit === u.unitId ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            Unit {i + 1}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setSelectedUnit('all')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-colors ${
+            selectedUnit === 'all' ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'
+          }`}
+        >
+          All
+        </button>
       </div>
 
       {/* Filter and Control Bar */}

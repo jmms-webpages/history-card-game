@@ -21,7 +21,7 @@ const RARITY_TEXT: Record<string, string> = {
   Mythical: 'text-purple-400'
 };
 
-export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({ onNavigate }) => {
+export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void; embedded?: boolean }> = ({ onNavigate, embedded = false }) => {
   const { userProfile, updateUserProfile, updateCoins } = useAuth();
   const { cards, getCardCopies, donateDuplicate } = useCards();
   const { gameSettings } = useQuestions();
@@ -30,7 +30,7 @@ export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({
   const [loading, setLoading] = useState(true);
   const [donatingId, setDonatingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [unitFilter, setUnitFilter] = useState<string>('all');
+  const [unitFilter, setUnitFilter] = useState<string>(embedded ? INITIAL_UNITS[0].unitId : 'all');
 
   const classCode = (userProfile?.classroomCode || '').trim().toUpperCase();
 
@@ -54,7 +54,8 @@ export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({
   const percent = activeCards.length > 0 ? Math.round((filledCount / activeCards.length) * 100) : 0;
 
   // Spare copies (beyond the first) of cards the class doesn't have yet.
-  const donatable: Card[] = activeCards.filter(c => !data.cards[c.cardId] && getCardCopies(c.cardId) >= 2);
+  const allDonatable: Card[] = activeCards.filter(c => !data.cards[c.cardId] && getCardCopies(c.cardId) >= 2);
+  const donatable: Card[] = unitFilter === 'all' ? allDonatable : allDonatable.filter(c => c.unitId === unitFilter);
 
   const topContributors = useMemo(() => {
     const tally: Record<string, { name: string; count: number }> = {};
@@ -136,7 +137,7 @@ export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({
               <Users className="w-3.5 h-3.5" />
               <span>{classLabel(gameSettings.classes || [], classCode)}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">Class Binder</h1>
+            {!embedded && <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100">Class Binder</h1>}
             <p className="text-sm text-slate-400 mt-1 max-w-xl">
               Donate your spare duplicates to build one shared collection for your whole class. Your first copy of every card always stays in your own binder.
             </p>
@@ -187,6 +188,32 @@ export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({
         {message && (
           <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-bold">{message}</div>
         )}
+      </div>
+
+      {/* Unit buttons: browse one unit at a time */}
+      <div className="flex flex-wrap gap-2">
+        {INITIAL_UNITS.map((u, i) => (
+          <button
+            key={u.unitId}
+            type="button"
+            title={u.unitName}
+            onClick={() => setUnitFilter(u.unitId)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-colors ${
+              unitFilter === u.unitId ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            Unit {i + 1}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setUnitFilter('all')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-colors ${
+            unitFilter === 'all' ? 'bg-amber-500 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'
+          }`}
+        >
+          All
+        </button>
       </div>
 
       {/* Donate */}
@@ -248,16 +275,6 @@ export const ClassBinderView: React.FC<{ onNavigate?: (tab: any) => void }> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="text-base font-bold text-slate-100">The Class Book</h2>
-          <select
-            value={unitFilter}
-            onChange={(e) => setUnitFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5"
-          >
-            <option value="all">All units</option>
-            {INITIAL_UNITS.map(u => (
-              <option key={u.unitId} value={u.unitId}>{u.unitName}</option>
-            ))}
-          </select>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {shownCards.map(card => {
