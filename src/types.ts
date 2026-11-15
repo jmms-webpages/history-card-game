@@ -215,6 +215,7 @@ export interface ClassroomStudent {
 export type NavigationTab = 
   | 'dashboard'
   | 'questions'
+  | 'practice'
   | 'packs'
   | 'collection'
   | 'leaderboard'

@@ -2,10 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useQuestions } from '../context/QuestionsContext';
 import { useAuth } from '../context/AuthContext';
 import { INITIAL_UNITS } from '../data/initialCurriculum';
+import { NavigationTab } from '../types';
 import { accuracyColor } from '../utils/adminStats';
 import { CheckCircle2, XCircle, Award, Coins, Flame, Volume2, VolumeX, RotateCcw, ArrowRight, Sparkles, BookOpen, Check, HelpCircle, Trophy, RefreshCcw, GraduationCap, ArrowLeftCircle } from 'lucide-react';
 
-export const QuestionsView: React.FC = () => {
+interface QuestionsViewProps {
+  mode?: 'daily' | 'practice';
+  onNavigate?: (tab: NavigationTab) => void;
+}
+
+export const QuestionsView: React.FC<QuestionsViewProps> = ({ mode = 'daily', onNavigate }) => {
+  const isPracticeTab = mode === 'practice';
   const { userProfile, isAdmin, isStudentViewMode } = useAuth();
   const {
     currentQuestion,
@@ -46,6 +53,12 @@ export const QuestionsView: React.FC = () => {
   useEffect(() => {
     setSelectedOption(null);
   }, [currentQuestion?.questionId]);
+
+  // The Practice tab and the Daily Trivia tab share this screen; the tab decides the mode.
+  useEffect(() => {
+    if (isPracticeTab && isReviewMode) exitReviewMode();
+    if (practiceMode !== isPracticeTab) setPracticeMode(isPracticeTab);
+  }, [isPracticeTab]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,9 +116,9 @@ export const QuestionsView: React.FC = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-semibold uppercase tracking-wider">
                 <Sparkles className="w-3 h-3" />
-                {isReviewMode ? 'Review Session' : 'Daily Trivia Quest'}
+                {isReviewMode ? 'Review Session' : isPracticeTab ? 'Practice' : 'Daily Trivia Quest'}
               </span>
-              {practiceMode && !isReviewMode && (
+              {isPracticeTab && !isReviewMode && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[11px] font-medium">
                   Practice Mode · no coins
                 </span>
@@ -117,7 +130,7 @@ export const QuestionsView: React.FC = () => {
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-serif text-slate-100 mt-1">
-              {isReviewMode ? 'Review Missed Questions' : 'Daily History Trivia'}
+              {isReviewMode ? 'Review Missed Questions' : isPracticeTab ? 'Practice by Unit' : 'Daily History Trivia'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
               {isReviewMode
@@ -299,7 +312,7 @@ export const QuestionsView: React.FC = () => {
             <span>Back to Daily Trivia</span>
           </button>
         </div>
-      ) : reviewQueueCount > 0 ? (
+      ) : reviewQueueCount > 0 && !isPracticeTab ? (
         <div className="bg-gradient-to-r from-indigo-500/10 via-slate-900 to-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center shrink-0">
@@ -325,25 +338,12 @@ export const QuestionsView: React.FC = () => {
       ) : null}
 
       {/* Practice: pick any units, no coins, misses don't go to Review */}
-      {!isReviewMode && (
+      {isPracticeTab && !isReviewMode && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-400">
-              {practiceMode
-                ? 'Practice earns no coins, and misses are not added to Review.'
-                : 'Want extra practice on specific units? It earns no coins.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => setPracticeMode(!practiceMode)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
-                practiceMode ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-              }`}
-            >
-              {practiceMode ? 'Back to Daily Quest' : 'Practice by Unit'}
-            </button>
-          </div>
-          {practiceMode && (
+          <p className="text-xs text-slate-400">
+            Pick the units you want to practice. Practice earns no coins, and misses are not added to Review.
+          </p>
+          {(
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -376,7 +376,7 @@ export const QuestionsView: React.FC = () => {
       )}
 
       {/* Daily Cap Banner when limit reached */}
-      {!isReviewMode && isDailyLimitReached && !practiceMode && (
+      {!isReviewMode && isDailyLimitReached && !isPracticeTab && (
         <div className="bg-gradient-to-r from-amber-500/15 via-slate-900 to-amber-500/15 border border-amber-500/30 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
@@ -393,10 +393,10 @@ export const QuestionsView: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => setPracticeMode(true)}
+            onClick={() => onNavigate?.('practice')}
             className="w-full sm:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors cursor-pointer shadow whitespace-nowrap"
           >
-            Continue in Practice Mode
+            Go to Practice
           </button>
         </div>
       )}
