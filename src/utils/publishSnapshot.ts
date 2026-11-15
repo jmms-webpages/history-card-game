@@ -30,6 +30,7 @@ export const startNewWeek = async (students: UserProfile[]): Promise<string> => 
     };
   });
   await setDoc(doc(db, 'adminData', 'weekBaseline'), { startedAt, byUid });
+  baselineCache = { at: Date.now(), value: { startedAt, byUid } };
   return startedAt;
 };
 
@@ -43,6 +44,26 @@ export const loadWeekBaseline = async (force = false): Promise<WeekBaseline | nu
   const value = snap && snap.exists() ? (snap.data() as WeekBaseline) : null;
   baselineCache = { at: Date.now(), value };
   return value;
+};
+
+// Weeks run 7 days from when you pressed Start New Week.
+export interface WeekStatus {
+  state: 'none' | 'running' | 'due' | 'overdue';
+  daysLeft: number; // negative when overdue
+  dueOn: Date | null;
+  label: string;
+}
+export const weekStatus = (baseline: WeekBaseline | null): WeekStatus => {
+  if (!baseline) return { state: 'none', daysLeft: 0, dueOn: null, label: 'No week started yet' };
+  const start = new Date(baseline.startedAt);
+  const dueOn = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysLeft = Math.round((dueOn.getTime() - today.getTime()) / 86400000);
+  if (daysLeft > 0) return { state: 'running', daysLeft, dueOn, label: `New week due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}` };
+  if (daysLeft === 0) return { state: 'due', daysLeft, dueOn, label: 'New week is due today' };
+  const late = -daysLeft;
+  return { state: 'overdue', daysLeft, dueOn, label: `New week is ${late} day${late === 1 ? '' : 's'} overdue` };
 };
 
 export const weeklyTotals = (students: UserProfile[], baseline: WeekBaseline | null) => {
