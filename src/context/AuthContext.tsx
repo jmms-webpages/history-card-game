@@ -276,7 +276,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? existingData.displayName
         : deriveDisplayName(googleDisplayName, isAdminUser ? 'Teacher & Director' : '8th Grade Student');
 
-    const combinedProfile: UserProfile = {
+    // The small set of fields a login sync is allowed to write to the server.
+    const loginFields: UserProfile = {
       uid,
       displayName,
       // Only written when true, so a login sync never counts as a name change.
@@ -293,9 +294,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       claimedAchievements: existingData.claimedAchievements ?? []
     };
 
+    // The in-memory profile must carry EVERYTHING already on the server (unit mastery,
+    // lifetime and daily counters, claimed rewards...). Building it from loginFields alone
+    // made those fields look empty after login, and the next answer then overwrote the
+    // real values on the server.
+    const combinedProfile: UserProfile = { ...existingData, ...loginFields };
+
     if (isFirebaseConfigured && db && doc && remoteConfirmed) {
       const userRef = doc(db, 'users', uid);
-      setDoc(userRef, { ...combinedProfile, updatedAt: Date.now() }, { merge: true }).catch(e => {
+      setDoc(userRef, { ...loginFields, updatedAt: Date.now() }, { merge: true }).catch(e => {
         console.warn('Async firestore write notice:', e);
       });
     }
