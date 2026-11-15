@@ -269,42 +269,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Curriculum Roadmap (Ohio 8th Grade Social Studies Units) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-bold text-slate-100">
-              Units
-            </h2>
-          </div>
-        </div>
-        <p className="text-xs text-slate-400 mb-6">
-          Here's what you'll be studying this year:
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {INITIAL_UNITS.map((unit) => (
-            <div 
-              key={unit.unitId}
-              className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3 hover:border-slate-700 transition-colors"
-            >
-              <div className="w-7 h-7 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-mono font-bold text-xs shrink-0">
-                {unit.order}
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">
-                  {unit.unitName}
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                  {unit.description}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Card Detail Inspection Modal */}
       {inspectCard && (
         <CardDetailModal
