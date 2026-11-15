@@ -118,6 +118,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               });
               return next as Card;
             });
+            // Teacher-created cards live only in Firestore; add any this device doesn't have yet.
+            const have = new Set(updated.map(c => c.cardId));
+            overrides.forEach((o, id) => {
+              if (have.has(id) || !o.custom || !o.name || !o.unitId || !o.rarity || !o.packTheme) return;
+              const { custom, ...cardData } = o;
+              updated.unshift({ imageUrl: '', active: true, ...cardData } as Card);
+            });
             try {
               localStorage.setItem(LOCAL_STORAGE_CARDS_KEY, JSON.stringify(updated));
             } catch {}
@@ -591,6 +598,13 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {
       // ignore
     }
+    // Save the whole card to Firestore so student devices load it with the catalog.
+    if (isFirebaseConfigured && db && doc && setDoc) {
+      setDoc(doc(db, 'cards', newCardId), { ...newCard, custom: true }).catch(e => {
+        console.warn('Custom card sync notice:', e);
+      });
+    }
+    updateGameSettings({ catalogVersion: Date.now() });
   };
 
   const updateCard = (cardId: string, patch: CardEdit) => {
