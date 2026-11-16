@@ -10,6 +10,9 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc, 
   getDoc, 
   setDoc, 
@@ -53,7 +56,17 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 let dbInstance: Firestore;
 try {
   const databaseId = (appletConfig as any).firestoreDatabaseId;
-  dbInstance = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  try {
+    // Offline storage: writes not yet sent (closed tab, lid shut, wifi drop) are kept on the
+    // device and sent the next time the app opens, instead of being lost.
+    const localCache = persistentLocalCache({ tabManager: persistentMultipleTabManager() });
+    dbInstance = databaseId
+      ? initializeFirestore(app, { localCache }, databaseId)
+      : initializeFirestore(app, { localCache });
+  } catch {
+    // Already initialized, or the browser can't store data: use the plain connection.
+    dbInstance = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
 } catch (err) {
   console.warn("Firestore initialization notice:", err);
   dbInstance = {} as Firestore;

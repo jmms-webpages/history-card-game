@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { Question, DailyActivity, GameSettings } from '../types';
 import { INITIAL_QUESTIONS } from '../data/questions';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
@@ -143,7 +143,7 @@ const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
 };
 
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userProfile, recordQuestionOutcome } = useAuth();
+  const { userProfile, recordQuestionOutcome, saveActivityTally } = useAuth();
   const todayKey = useMemo(() => getTodayKey(), []);
 
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
@@ -424,12 +424,64 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
   const [tally, setTally] = useState<StoredTally>(readTally);
   useEffect(() => { setTally(readTally()); }, [tallyStorageKey, todayKey, weekKeyNow]);
+  // Saving the tally to the profile in batches: after a 3-minute pause, after every 20
+  // answers, or when the tab is hidden/closed. Each save needs at least one new answer.
+  const unsavedRef = useRef(0);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushTally = () => {
+    if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
+    if (unsavedRef.current === 0 || !userProfile) return;
+    const t = readTally();
+    unsavedRef.current = 0;
+    saveActivityTally({
+      tallyDay: t.day, tallyDayQ: t.dq, tallyDayC: t.dc,
+      tallyWeek: t.week, tallyWeekQ: t.wq, tallyWeekC: t.wc
+    });
+  };
+  const flushRef = useRef(flushTally);
+  flushRef.current = flushTally;
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushRef.current(); };
+    const onPageHide = () => flushRef.current();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, []);
+
   const bumpTally = (isCorrect: boolean) => {
     const t = readTally();
     const next: StoredTally = { ...t, dq: t.dq + 1, dc: t.dc + (isCorrect ? 1 : 0), wq: t.wq + 1, wc: t.wc + (isCorrect ? 1 : 0) };
     setTally(next);
     try { localStorage.setItem(tallyStorageKey, JSON.stringify(next)); } catch {}
+    unsavedRef.current += 1;
+    if (unsavedRef.current >= 20) {
+      flushRef.current();
+    } else {
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = setTimeout(() => flushRef.current(), 3 * 60 * 1000);
+    }
   };
+
+  // Pick up saved totals from the profile (new device, cleared browser). Never lowers local numbers.
+  useEffect(() => {
+    if (!userProfile) return;
+    const t = readTally();
+    let dq = t.dq, dc = t.dc, wq = t.wq, wc = t.wc;
+    if (userProfile.tallyDay === todayKey && (userProfile.tallyDayQ || 0) > dq) {
+      dq = userProfile.tallyDayQ || 0; dc = userProfile.tallyDayC || 0;
+    }
+    if (userProfile.tallyWeek === weekKeyNow && (userProfile.tallyWeekQ || 0) > wq) {
+      wq = userProfile.tallyWeekQ || 0; wc = userProfile.tallyWeekC || 0;
+    }
+    if (dq !== t.dq || wq !== t.wq) {
+      const next: StoredTally = { ...t, dq, dc, wq, wc };
+      setTally(next);
+      try { localStorage.setItem(tallyStorageKey, JSON.stringify(next)); } catch {}
+    }
+  }, [userProfile?.uid, userProfile?.tallyDay, userProfile?.tallyDayQ, userProfile?.tallyWeek, userProfile?.tallyWeekQ]);
   const activityTally: ActivityTally = { todayQuestions: tally.dq, todayCorrect: tally.dc, weekQuestions: tally.wq, weekCorrect: tally.wc };
 
   const [lastOSTResult, setLastOSTResult] = useState<AnswerResult | null>(null);

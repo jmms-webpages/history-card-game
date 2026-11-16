@@ -26,9 +26,13 @@ export interface UserProfile {
   todayDate?: string;
   todayQuestions?: number;
   todayCorrect?: number;
-  weekDate?: string; // Monday (YYYY-MM-DD) of the week the counters below belong to
-  weekQuestions?: number;
-  weekCorrect?: number;
+  // Saved copy of the dashboard's all-answers tally (Today / This Week); saved in batches.
+  tallyDay?: string;
+  tallyDayQ?: number;
+  tallyDayC?: number;
+  tallyWeek?: string; // Monday (YYYY-MM-DD) of the week the weekly numbers belong to
+  tallyWeekQ?: number;
+  tallyWeekC?: number;
   // Engagement features -- all stored on the user doc so they ride along with
   // writes that already happen (no extra reads).
   claimedGoalIds?: string[];

@@ -40,6 +40,7 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<Pick<UserProfile, 'avatar' | 'classroomCode' | 'totalCardsCollected' | 'uniqueCardsCollected' | 'claimedAchievements' | 'claimedGoalIds' | 'claimedClassMilestones' | 'claimedSubmissionIds' | 'classDonations'>>) => Promise<void>;
   recordQuestionOutcome: (params: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => Promise<void>;
   updateCoins: (deltaCoins: number) => Promise<number>;
+  saveActivityTally: (fields: Partial<UserProfile>) => void;
   joinClass: (classCode: string, password: string) => Promise<void>;
   completeSetup: (displayName: string, avatar: string) => Promise<void>;
   clearError: () => void;
@@ -300,7 +301,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // real values on the server.
     const combinedProfile: UserProfile = { ...existingData, ...loginFields };
 
-    if (isFirebaseConfigured && db && doc && remoteConfirmed) {
+    // Only write when something actually changed, or at most once a day for the last-login
+    // stamp. Every login used to cost a write even when nothing was different.
+    const sameDayLogin =
+      !!existingData.lastLoginAt && new Date(existingData.lastLoginAt).toDateString() === new Date(now).toDateString();
+    const { lastLoginAt: _l, createdAt: _c, ...loginCompare } = loginFields;
+    const unchanged = (Object.keys(loginCompare) as (keyof typeof loginCompare)[]).every(
+      k => JSON.stringify((existingData as any)[k]) === JSON.stringify((loginCompare as any)[k])
+    );
+    if (isFirebaseConfigured && db && doc && remoteConfirmed && !(sameDayLogin && unchanged)) {
       const userRef = doc(db, 'users', uid);
       setDoc(userRef, { ...loginFields, updatedAt: Date.now() }, { merge: true }).catch(e => {
         console.warn('Async firestore write notice:', e);
@@ -477,6 +486,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Bundles a coin change and a unit-mastery change into ONE Firestore
   // write -- this is what keeps mastery tracking from costing any extra
   // reads/writes beyond what answering a question already spent.
+  // Batched save of the dashboard tally (one write for many answers).
+  const saveActivityTally = (fields: Partial<UserProfile>) => {
+    const updated = applyProfileUpdate(fields);
+    if (!updated) return;
+    if (isFirebaseConfigured && db && doc) {
+      updateDoc(doc(db, 'users', updated.uid), { ...fields, updatedAt: Date.now() }).catch(e => {
+        console.warn('Tally save notice:', e);
+      });
+    }
+  };
+
   const recordQuestionOutcome = async ({ coinsDelta, unitId, masteryDelta, isCorrect }: { coinsDelta: number; unitId?: string; masteryDelta?: number; isCorrect?: boolean }) => {
     const base = userProfileRef.current;
     if (!base) return;
@@ -498,14 +518,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updates.todayDate = dayKey;
       updates.todayQuestions = (sameDay ? base.todayQuestions || 0 : 0) + 1;
       updates.todayCorrect = (sameDay ? base.todayCorrect || 0 : 0) + (isCorrect ? 1 : 0);
-      // Calendar-week counters (Mon-Sun) for the student's own dashboard; ride on this same write.
-      const nowD = new Date();
-      const mon = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - ((nowD.getDay() + 6) % 7));
-      const weekKey = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
-      const sameWeek = base.weekDate === weekKey;
-      updates.weekDate = weekKey;
-      updates.weekQuestions = (sameWeek ? base.weekQuestions || 0 : 0) + 1;
-      updates.weekCorrect = (sameWeek ? base.weekCorrect || 0 : 0) + (isCorrect ? 1 : 0);
     }
 
     const updated = applyProfileUpdate(updates);
@@ -547,6 +559,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       isStudentViewMode,
       recordQuestionOutcome,
+      saveActivityTally,
       setStudentViewMode,
       toggleStudentViewMode,
       loginWithGoogle,
