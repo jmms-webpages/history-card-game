@@ -64,7 +64,7 @@ const LOCAL_STORAGE_INVENTORY_PREFIX = 'history_card_quest_inv_';
 
 export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userProfile, updateCoins, updateUserProfile } = useAuth();
-  const { gameSettings, updateGameSettings } = useQuestions();
+  const { gameSettings, updateGameSettings, bumpCatalogVersion } = useQuestions();
   const inventoryRef = React.useRef<InventoryItem[]>([]);
 
   const [cards, setCards] = useState<Card[]>(() => {
@@ -605,7 +605,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Custom card sync notice:', e);
       });
     }
-    updateGameSettings({ catalogVersion: Date.now() });
+    bumpCatalogVersion();
   };
 
   // Only teacher-created cards can be deleted (built-in cards would just come back; Vault them instead).
@@ -624,7 +624,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Card delete sync notice:', e);
       });
     }
-    updateGameSettings({ catalogVersion: Date.now() });
+    bumpCatalogVersion();
   };
 
   const updateCard = (cardId: string, patch: CardEdit) => {
@@ -645,7 +645,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Card edit sync notice:', e);
       });
     }
-    updateGameSettings({ catalogVersion: Date.now() });
+    bumpCatalogVersion();
   };
 
   const toggleCardActive = (cardId: string) => {
@@ -670,7 +670,7 @@ export const CardsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Card catalog sync notice:', e);
       });
     }
-    updateGameSettings({ catalogVersion: Date.now() });
+    bumpCatalogVersion();
   };
 
   return (

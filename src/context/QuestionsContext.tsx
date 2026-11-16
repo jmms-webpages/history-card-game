@@ -46,6 +46,7 @@ interface QuestionsContextType {
   activityTally: ActivityTally;
   gameSettings: GameSettings;
   updateGameSettings: (settings: Partial<GameSettings>) => void;
+  bumpCatalogVersion: () => void;
   soundEnabled: boolean;
   setSoundEnabled: (enabled: boolean) => void;
   hasAnsweredCurrent: boolean;
@@ -226,7 +227,34 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const bumpCatalogVersion = () => updateGameSettings({ catalogVersion: Date.now() });
+  // Every catalog bump makes each student device re-read the questions/cards collections, so
+  // edits made in one sitting are grouped into ONE bump (2 minutes after the last edit, or
+  // when the teacher leaves the page).
+  const catalogBumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const catalogBumpPending = useRef(false);
+  const flushCatalogBump = () => {
+    if (catalogBumpTimer.current) { clearTimeout(catalogBumpTimer.current); catalogBumpTimer.current = null; }
+    if (!catalogBumpPending.current) return;
+    catalogBumpPending.current = false;
+    updateGameSettings({ catalogVersion: Date.now() });
+  };
+  const flushCatalogRef = useRef(flushCatalogBump);
+  flushCatalogRef.current = flushCatalogBump;
+  const bumpCatalogVersion = () => {
+    catalogBumpPending.current = true;
+    if (catalogBumpTimer.current) clearTimeout(catalogBumpTimer.current);
+    catalogBumpTimer.current = setTimeout(() => flushCatalogRef.current(), 2 * 60 * 1000);
+  };
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushCatalogRef.current(); };
+    const onPageHide = () => flushCatalogRef.current();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, []);
 
   const [questions, setQuestions] = useState<Question[]>(() => {
     try {
@@ -824,6 +852,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         activityTally,
         gameSettings,
         updateGameSettings,
+        bumpCatalogVersion,
         soundEnabled,
         setSoundEnabled,
         hasAnsweredCurrent,

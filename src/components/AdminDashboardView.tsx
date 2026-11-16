@@ -69,6 +69,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   // fullReload=true re-reads everyone (also picks up removed students).
   const fetchStudents = async (fullReload = false): Promise<UserProfile[] | undefined> => {
     if (!isFirebaseConfigured || !db || !collection || !getDocs || !query || !where) return;
+    // Refreshing again within a minute just reuses what's already loaded (no reads).
+    if (!fullReload && students.length > 0) {
+      let last = 0;
+      try { last = Number(localStorage.getItem(ROSTER_SYNC_KEY) || 0); } catch { /* ignore */ }
+      if (last > 0 && Date.now() - last < 60000) return students;
+    }
     setLoadingStudents(true);
     try {
       const usersColl = collection(db, 'users');
