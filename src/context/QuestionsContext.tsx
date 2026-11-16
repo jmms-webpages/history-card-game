@@ -887,8 +887,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 // Short on purpose: class goals, closed packs and the focus unit should reach
 // students within minutes. It is one document read per student per window.
-const SETTINGS_POLL_MS = 4 * 60 * 1000;
-const SETTINGS_OPEN_TTL_MS = 2 * 60 * 1000;
+const SETTINGS_POLL_MS = 10 * 60 * 1000;
+const SETTINGS_OPEN_TTL_MS = 5 * 60 * 1000;
 
 export const useQuestions = () => {
   const context = useContext(QuestionsContext);
