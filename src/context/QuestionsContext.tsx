@@ -30,10 +30,20 @@ interface AnswerResult {
   isReviewMode: boolean;
 }
 
+// Every answer the student gives (daily, review, practice, OST), for the dashboard's
+// Today / This Week cards. Kept on the device so practice costs no Firestore writes.
+export interface ActivityTally {
+  todayQuestions: number;
+  todayCorrect: number;
+  weekQuestions: number;
+  weekCorrect: number;
+}
+
 interface QuestionsContextType {
   questions: Question[];
   currentQuestion: Question | null;
   dailyActivity: DailyActivity;
+  activityTally: ActivityTally;
   gameSettings: GameSettings;
   updateGameSettings: (settings: Partial<GameSettings>) => void;
   soundEnabled: boolean;
@@ -390,6 +400,38 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setPracticeUnitIdsState(ids);
     resetAnswerState();
   };
+  // All-answers tally (device-local; see ActivityTally).
+  const weekKeyNow = useMemo(() => {
+    const d = new Date();
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+    return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+  }, [todayKey]);
+  const tallyStorageKey = `hcq_tally_${userProfile?.uid || 'guest'}`;
+  interface StoredTally { day: string; dq: number; dc: number; week: string; wq: number; wc: number }
+  const readTally = (): StoredTally => {
+    let t: StoredTally = { day: todayKey, dq: 0, dc: 0, week: weekKeyNow, wq: 0, wc: 0 };
+    try {
+      const raw = localStorage.getItem(tallyStorageKey);
+      if (raw) {
+        const p = JSON.parse(raw) as StoredTally;
+        t = {
+          day: todayKey, dq: p.day === todayKey ? p.dq || 0 : 0, dc: p.day === todayKey ? p.dc || 0 : 0,
+          week: weekKeyNow, wq: p.week === weekKeyNow ? p.wq || 0 : 0, wc: p.week === weekKeyNow ? p.wc || 0 : 0
+        };
+      }
+    } catch {}
+    return t;
+  };
+  const [tally, setTally] = useState<StoredTally>(readTally);
+  useEffect(() => { setTally(readTally()); }, [tallyStorageKey, todayKey, weekKeyNow]);
+  const bumpTally = (isCorrect: boolean) => {
+    const t = readTally();
+    const next: StoredTally = { ...t, dq: t.dq + 1, dc: t.dc + (isCorrect ? 1 : 0), wq: t.wq + 1, wc: t.wc + (isCorrect ? 1 : 0) };
+    setTally(next);
+    try { localStorage.setItem(tallyStorageKey, JSON.stringify(next)); } catch {}
+  };
+  const activityTally: ActivityTally = { todayQuestions: tally.dq, todayCorrect: tally.dc, weekQuestions: tally.wq, weekCorrect: tally.wc };
+
   const [lastOSTResult, setLastOSTResult] = useState<AnswerResult | null>(null);
 
   // Regular daily trivia pool excludes OST questions -- those live in their
@@ -475,6 +517,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Practice is for learning only: no coins, no mastery, no counters, and a
     // wrong answer is NOT added to Review. It just moves on.
     if (practiceMode && !isReviewMode) {
+      bumpTally(isCorrect);
       if (isCorrect) {
         sounds.playCorrect();
         setStreak(s => s + 1);
@@ -497,6 +540,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return practiceResult;
     }
 
+    bumpTally(isCorrect);
     let coinsAwarded = 0;
     let masteryDelta = 0;
 
@@ -590,6 +634,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const isCorrect = answerIndex === todaysOSTQuestion.correctAnswer;
     const coinsAwarded = isCorrect ? OST_CORRECT_REWARD : 0;
+    bumpTally(isCorrect);
 
     if (isCorrect) {
       sounds.playCorrect();
@@ -724,6 +769,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         questions,
         currentQuestion,
         dailyActivity,
+        activityTally,
         gameSettings,
         updateGameSettings,
         soundEnabled,
