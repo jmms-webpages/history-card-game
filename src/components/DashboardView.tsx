@@ -20,7 +20,7 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { userProfile } = useAuth();
-  const { dailyActivity, gameSettings, setPracticeUnitIds } = useQuestions();
+  const { dailyActivity, gameSettings, setPracticeUnitIds, activityTally } = useQuestions();
   const { stats, inventoryCards, isCardOwned, getCardCopies, cards } = useCards();
 
   // Same card for the whole class each day -- a deterministic pick from
@@ -46,15 +46,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const dailyAnswered = dailyActivity?.questionsAnswered ?? 0;
   const dailyLimit = gameSettings?.dailyQuestionLimit ?? 10;
 
-  // Today / this week (Mon-Sun), straight from the student's own profile.
-  const todayKey = getTodayKey();
-  const todayQ = userProfile.todayDate === todayKey ? userProfile.todayQuestions || 0 : 0;
-  const todayC = userProfile.todayDate === todayKey ? userProfile.todayCorrect || 0 : 0;
-  const nowD = new Date();
-  const mon = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - ((nowD.getDay() + 6) % 7));
-  const weekKey = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
-  const weekQ = userProfile.weekDate === weekKey ? userProfile.weekQuestions || 0 : 0;
-  const weekC = userProfile.weekDate === weekKey ? userProfile.weekCorrect || 0 : 0;
+  // Today / this week (Mon-Sun): every answer counts (daily, review and practice).
+  const todayQ = activityTally.todayQuestions;
+  const todayC = activityTally.todayCorrect;
+  const weekQ = activityTally.weekQuestions;
+  const weekC = activityTally.weekCorrect;
 
   const split = (right: number, total: number) => {
     const pct = total > 0 ? Math.round((right / total) * 100) : null;

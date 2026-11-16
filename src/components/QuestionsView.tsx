@@ -90,7 +90,7 @@ export const QuestionsView: React.FC<QuestionsViewProps> = ({ mode = 'daily', on
 
   // Focus-unit questions get a gold look so students know they pay a bonus.
   const isFocusQuestion =
-    !isReviewMode && !practiceMode && !!gameSettings?.focusUnitId && currentQuestion?.unitId === gameSettings.focusUnitId;
+    !isReviewMode && !!gameSettings?.focusUnitId && currentQuestion?.unitId === gameSettings.focusUnitId;
 
   const questionsAnswered = dailyActivity?.questionsAnswered ?? 0;
   const correctAnswers = dailyActivity?.correctAnswers ?? 0;
@@ -410,7 +410,7 @@ export const QuestionsView: React.FC<QuestionsViewProps> = ({ mode = 'daily', on
         }`}>
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            {isFocusQuestion && (
+            {isFocusQuestion && !practiceMode && (
               <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
                 ⭐ Bonus Focus: +{gameSettings.focusCorrectReward ?? gameSettings.correctCoinReward} coins
               </span>

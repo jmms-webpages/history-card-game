@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { Question, DailyActivity, GameSettings } from '../types';
 import { INITIAL_QUESTIONS } from '../data/questions';
 import { DEFAULT_GAME_SETTINGS } from '../data/initialCurriculum';
@@ -30,10 +30,20 @@ interface AnswerResult {
   isReviewMode: boolean;
 }
 
+// Every answer the student gives (daily, review, practice, OST), for the dashboard's
+// Today / This Week cards. Kept on the device so practice costs no Firestore writes.
+export interface ActivityTally {
+  todayQuestions: number;
+  todayCorrect: number;
+  weekQuestions: number;
+  weekCorrect: number;
+}
+
 interface QuestionsContextType {
   questions: Question[];
   currentQuestion: Question | null;
   dailyActivity: DailyActivity;
+  activityTally: ActivityTally;
   gameSettings: GameSettings;
   updateGameSettings: (settings: Partial<GameSettings>) => void;
   soundEnabled: boolean;
@@ -133,7 +143,7 @@ const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
 };
 
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userProfile, recordQuestionOutcome } = useAuth();
+  const { userProfile, recordQuestionOutcome, saveActivityTally } = useAuth();
   const todayKey = useMemo(() => getTodayKey(), []);
 
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
@@ -390,6 +400,90 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setPracticeUnitIdsState(ids);
     resetAnswerState();
   };
+  // All-answers tally (device-local; see ActivityTally).
+  const weekKeyNow = useMemo(() => {
+    const d = new Date();
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+    return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+  }, [todayKey]);
+  const tallyStorageKey = `hcq_tally_${userProfile?.uid || 'guest'}`;
+  interface StoredTally { day: string; dq: number; dc: number; week: string; wq: number; wc: number }
+  const readTally = (): StoredTally => {
+    let t: StoredTally = { day: todayKey, dq: 0, dc: 0, week: weekKeyNow, wq: 0, wc: 0 };
+    try {
+      const raw = localStorage.getItem(tallyStorageKey);
+      if (raw) {
+        const p = JSON.parse(raw) as StoredTally;
+        t = {
+          day: todayKey, dq: p.day === todayKey ? p.dq || 0 : 0, dc: p.day === todayKey ? p.dc || 0 : 0,
+          week: weekKeyNow, wq: p.week === weekKeyNow ? p.wq || 0 : 0, wc: p.week === weekKeyNow ? p.wc || 0 : 0
+        };
+      }
+    } catch {}
+    return t;
+  };
+  const [tally, setTally] = useState<StoredTally>(readTally);
+  useEffect(() => { setTally(readTally()); }, [tallyStorageKey, todayKey, weekKeyNow]);
+  // Saving the tally to the profile in batches: after a 3-minute pause, after every 20
+  // answers, or when the tab is hidden/closed. Each save needs at least one new answer.
+  const unsavedRef = useRef(0);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushTally = () => {
+    if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
+    if (unsavedRef.current === 0 || !userProfile) return;
+    const t = readTally();
+    unsavedRef.current = 0;
+    saveActivityTally({
+      tallyDay: t.day, tallyDayQ: t.dq, tallyDayC: t.dc,
+      tallyWeek: t.week, tallyWeekQ: t.wq, tallyWeekC: t.wc
+    });
+  };
+  const flushRef = useRef(flushTally);
+  flushRef.current = flushTally;
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushRef.current(); };
+    const onPageHide = () => flushRef.current();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, []);
+
+  const bumpTally = (isCorrect: boolean) => {
+    const t = readTally();
+    const next: StoredTally = { ...t, dq: t.dq + 1, dc: t.dc + (isCorrect ? 1 : 0), wq: t.wq + 1, wc: t.wc + (isCorrect ? 1 : 0) };
+    setTally(next);
+    try { localStorage.setItem(tallyStorageKey, JSON.stringify(next)); } catch {}
+    unsavedRef.current += 1;
+    if (unsavedRef.current >= 20) {
+      flushRef.current();
+    } else {
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = setTimeout(() => flushRef.current(), 3 * 60 * 1000);
+    }
+  };
+
+  // Pick up saved totals from the profile (new device, cleared browser). Never lowers local numbers.
+  useEffect(() => {
+    if (!userProfile) return;
+    const t = readTally();
+    let dq = t.dq, dc = t.dc, wq = t.wq, wc = t.wc;
+    if (userProfile.tallyDay === todayKey && (userProfile.tallyDayQ || 0) > dq) {
+      dq = userProfile.tallyDayQ || 0; dc = userProfile.tallyDayC || 0;
+    }
+    if (userProfile.tallyWeek === weekKeyNow && (userProfile.tallyWeekQ || 0) > wq) {
+      wq = userProfile.tallyWeekQ || 0; wc = userProfile.tallyWeekC || 0;
+    }
+    if (dq !== t.dq || wq !== t.wq) {
+      const next: StoredTally = { ...t, dq, dc, wq, wc };
+      setTally(next);
+      try { localStorage.setItem(tallyStorageKey, JSON.stringify(next)); } catch {}
+    }
+  }, [userProfile?.uid, userProfile?.tallyDay, userProfile?.tallyDayQ, userProfile?.tallyWeek, userProfile?.tallyWeekQ]);
+  const activityTally: ActivityTally = { todayQuestions: tally.dq, todayCorrect: tally.dc, weekQuestions: tally.wq, weekCorrect: tally.wc };
+
   const [lastOSTResult, setLastOSTResult] = useState<AnswerResult | null>(null);
 
   // Regular daily trivia pool excludes OST questions -- those live in their
@@ -475,6 +569,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Practice is for learning only: no coins, no mastery, no counters, and a
     // wrong answer is NOT added to Review. It just moves on.
     if (practiceMode && !isReviewMode) {
+      bumpTally(isCorrect);
       if (isCorrect) {
         sounds.playCorrect();
         setStreak(s => s + 1);
@@ -497,6 +592,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return practiceResult;
     }
 
+    bumpTally(isCorrect);
     let coinsAwarded = 0;
     let masteryDelta = 0;
 
@@ -590,6 +686,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const isCorrect = answerIndex === todaysOSTQuestion.correctAnswer;
     const coinsAwarded = isCorrect ? OST_CORRECT_REWARD : 0;
+    bumpTally(isCorrect);
 
     if (isCorrect) {
       sounds.playCorrect();
@@ -724,6 +821,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         questions,
         currentQuestion,
         dailyActivity,
+        activityTally,
         gameSettings,
         updateGameSettings,
         soundEnabled,
