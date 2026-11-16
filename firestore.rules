@@ -68,7 +68,9 @@ service cloud.firestore {
 
     // Daily question limit, enforced server-side so clearing browser data or
     // editing the app can't bypass it. todayQuestions can only go up by one per
-    // write within a day, never past the teacher's dailyQuestionLimit (read from
+    // write within a day. Up to 20 answers pass with no settings read at all (so the
+    // common case costs zero reads); above 20 it is checked against the teacher's
+    // dailyQuestionLimit (read from
     // settings/gameSettings; that get() is one billed read per answer write).
     // A new day must carry a LATER date that matches today's date in US Eastern
     // time (EST/EDT) and restart the count at 1. Ohio school = Eastern only.
@@ -85,7 +87,8 @@ service cloud.firestore {
       let oldCount = r.get('todayQuestions', 0);
       return d.todayQuestions is int &&
         d.todayDate is string &&
-        d.todayQuestions <= get(/databases/$(database)/documents/settings/gameSettings).data.get('dailyQuestionLimit', 20) &&
+        (d.todayQuestions <= 20 ||
+          d.todayQuestions <= get(/databases/$(database)/documents/settings/gameSettings).data.get('dailyQuestionLimit', 20)) &&
         (
           (d.todayDate == oldDate &&
             d.todayQuestions >= oldCount &&
